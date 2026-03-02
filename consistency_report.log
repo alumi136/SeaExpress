@@ -1,0 +1,122 @@
+==================================================
+海快報關自動化 - 檔案一致性檢核報告
+執行時間: 2026-02-16 11:37:23
+==================================================
+掃描 Excel 目錄: /mnt/gdrive/SeaExpress_Automation_Project/SeaExpress_Core/uploads/daily_excel
+掃描 History 目錄: /mnt/gdrive/SeaExpress_Automation_Project/SeaExpress_Core/uploads/xml_history
+--------------------------------------------------
+【統計摘要】
+  Excel 檔案數   : 285
+  History 檔案數 : 267
+--------------------
+✅ 一致 (成對) 筆數 : 226
+❌ 不一致 (缺漏) 筆數 : 100
+--------------------------------------------------
+
+【不一致詳細清單】
+
+[Excel 有，但 History 缺漏 XML/ZIP] - 共 59 筆:
+  - AYLD25071202EX.xlsx
+  - HSK251288021.xlsx
+  - HSK251288024.xlsx
+  - HSK251288027.xlsx
+  - HSK251288029.xlsx
+  - HSK251288030.xlsx
+  - HSK251288031.xlsx
+  - HSK251288033.xlsx
+  - HSK251288037.xlsx
+  - HSK251288039.xlsx
+  - HSK251288052.xlsx
+  - HSK251288053.xlsx
+  - HSK251288058.xlsx
+  - HSK251288059.xlsx
+  - HSK251288060.xlsx
+  - HSK251288062.xlsx
+  - HSK251288066.xlsx
+  - HSK251288067.xlsx
+  - HSK251288069.xlsx
+  - HSK251288085.xlsx
+  - HSK251288097.xlsx
+  - HSK251288104.xlsx
+  - HSK251288108.xlsx
+  - HSK25128811.xlsx
+  - HSK251288110.xlsx
+  - HSK251288126.xlsx
+  - HSK251288128.xlsx
+  - HSK251288133.xlsx
+  - HSK251288136.xlsx
+  - HSK251288140.xlsx
+  - HSK260189002.xlsx
+  - HYB1728021.xlsx
+  - IPC250108406EX.xlsx
+  - IPC250109411EX.xlsx
+  - IPC250304722EX.xlsx
+  - IPC250405417EX.xlsx
+  - IPC25041704EX.xlsx
+  - IPC250612404EX.xlsx
+  - IPC250614402EX.xlsx
+  - IPC250702402EX.xlsx
+  - IPC250908412EX.xlsx
+  - IPC250913413EX.xlsx
+  - IPC250915410EX.xlsx
+  - IPC250916404EX.xlsx
+  - IPC250920403EX.xlsx
+  - IPC250920419EX.xlsx
+  - IPC250920420EX.xlsx
+  - IPC250922406EX.xlsx
+  - IPC250922407EX.xlsx
+  - IPC250922408EX.xlsx
+  - IPC250922411EX.xlsx
+  - IPC250923415EX.xlsx
+  - IPC250923417EX.xlsx
+  - IPC250923418EX.xlsx
+  - IPC251002412EX.xlsx
+  - IPC251002456EX.xlsx
+  - IPC251002457EX.xlsx
+  - IPC251004405EX.xlsx
+  - IPC251004406EX.xlsx
+
+[History 有，但 Excel 缺漏 XLSX] - 共 41 筆:
+  - 25030801EX (2).zip
+  - 25032203EX.zip
+  - 25040104EX.zip
+  - AYLD25061101EX (2).zip
+  - AYLD25061102EX (2).zip
+  - IPC250301421EX.zip
+  - IPC250303410EX.zip
+  - IPC250308421EX.zip
+  - IPC250311734EX (2).zip
+  - IPC250322408EX.zip
+  - IPC250322412EX.zip
+  - IPC250324412EX.zip
+  - IPC250324413EX.zip
+  - IPC250325421EX.zip
+  - IPC250325423EX.zip
+  - IPC250326720EX.zip
+  - IPC250326721EX.zip
+  - IPC250327403EX.zip
+  - IPC250329407EX.zip
+  - IPC250329410EX.zip
+  - IPC250331401EX.zip
+  - IPC250331405EX.zip
+  - IPC250403407EX.zip
+  - IPC250403408EX.zip
+  - IPC250403409EX.zip
+  - IPC250414417EX (2).zip
+  - IPC250415416EX (2).zip
+  - IPC250416720EX (2).zip
+  - IPC250417407EX (2).zip
+  - IPC250419401EX (2).zip
+  - IPC250422722EX (2).zip
+  - IPC250423722EX (2).zip
+  - IPC250424402EX (2).zip
+  - IPC250424404EX (2).zip
+  - IPC250424406EX (2).zip
+  - IPC25042602EX (2).zip
+  - IPC250426401EX (2).zip
+  - IPC250426402EX (2).zip
+  - IPC250909417EX (2).zip
+  - IPC251004406EX (2).zip
+  - IPC251122404EX.zip
+
+==================================================

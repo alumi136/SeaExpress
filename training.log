@@ -1,0 +1,227 @@
+2026-02-11 23:07:44,674 - INFO - 🚀 開始執行批次訓練 (Batch Training)...
+2026-02-11 23:07:44,677 - INFO - 正在讀取歷史資料 (Table A & Table B)...
+2026-02-11 23:07:44,929 - INFO - 總分提單數: A=0, B=1035
+2026-02-11 23:07:44,930 - INFO - 符合「項次數量一致(1對1)」的有效訓練單數: 0
+2026-02-11 23:07:44,930 - WARNING - 沒有符合訓練條件的資料。請確認 Table A 與 B 是否有成對的主/分提單號。
+2026-02-11 23:10:46,696 - INFO - 🚀 開始執行批次訓練 (Batch Training)...
+2026-02-11 23:10:46,698 - INFO - 正在讀取歷史資料 (Table A & Table B)...
+2026-02-11 23:10:46,963 - INFO - 總分提單數: A=1035, B=1035
+2026-02-11 23:10:46,964 - INFO - 符合「項次數量一致(1對1)」的有效訓練單數: 1030
+2026-02-11 23:10:46,993 - INFO - 正在進行知識萃取與多數決投票...
+2026-02-11 23:10:47,002 - INFO - 學習完成，共提取 1381 條標準知識。準備寫入...
+2026-02-11 23:10:47,203 - INFO - ✅ 標準知識庫已更新完畢！
+2026-02-14 23:39:39,471 - INFO - 🚀 開始執行批次訓練 (Batch Training)...
+2026-02-14 23:39:39,479 - INFO - 正在讀取歷史資料 (Table A & Table B)...
+2026-02-14 23:39:45,218 - INFO - 總分提單數: A=2723, B=17678
+2026-02-14 23:39:45,218 - INFO - 符合「項次數量一致(1對1)」的有效訓練單數: 2702
+2026-02-14 23:39:45,256 - INFO - 正在進行知識萃取與多數決投票...
+2026-02-14 23:39:45,299 - INFO - 學習完成，共提取 3205 條標準知識。準備寫入...
+2026-02-14 23:39:46,162 - ERROR - 訓練過程發生錯誤: Execution failed on sql 'INSERT INTO standard_knowledge_base (original_description, official_description, ccc_code, frequency) VALUES (:original_description, :official_description, :ccc_code, :frequency)': (pymysql.err.IntegrityError) (1062, "Duplicate entry 'Polo衫' for key 'uk_original_desc'")
+[SQL: INSERT INTO standard_knowledge_base (original_description, official_description, ccc_code, frequency) VALUES (%(original_description)s, %(official_description)s, %(ccc_code)s, %(frequency)s)]
+[parameters: [{'original_description': '户外椅子凳子', 'official_description': '椅子配件', 'ccc_code': '9402.10.92.00-3', 'frequency': 4}, {'original_description': '宝宝辅食机/料理机/食物搅拌器', 'official_description': '家用器具', 'ccc_code': '7321.89.90.00-3', 'frequency': 1}, {'original_description': 'USB风扇', 'official_description': '風扇配件', 'ccc_code': '8414.90.90.00-6', 'frequency': 25}, {'original_description': '手机贴膜', 'official_description': '膠膜', 'ccc_code': '3926.90.39.00-1', 'frequency': 19}, {'original_description': '汽车装饰贴/反光贴', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 4}, {'original_description': '智能手表', 'official_description': '手錶', 'ccc_code': '9101.19.90.00-0', 'frequency': 3}, {'original_description': '手机充电器', 'official_description': '充電器', 'ccc_code': '8504.40.20.00-3', 'frequency': 19}, {'original_description': '自拍杆/架', 'official_description': '架子', 'ccc_code': '8302.49.00.00-2', 'frequency': 4}  ... displaying 10 of 3205 total bound parameter sets ...  {'original_description': '車貼紙', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 1}, {'original_description': '二件套', 'official_description': 'SHIRT', 'ccc_code': '6110.20.00.00-1', 'frequency': 1}]]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor,
+        ^^^^^^^
+    ...<2 lines>...
+        context,
+        ^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\dialects\mysql\mysqldb.py", line 196, in do_executemany
+    rowcount = cursor.executemany(statement, parameters)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 182, in executemany
+    return self._do_execute_many(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        q_prefix,
+        ^^^^^^^^^
+    ...<4 lines>...
+        self._get_db().encoding,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 220, in _do_execute_many
+    rows += self.execute(sql + postfix)
+            ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 153, in execute
+    result = self._query(query)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 322, in _query
+    conn.query(q)
+    ~~~~~~~~~~^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 575, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 826, in _read_query_result
+    result.read()
+    ~~~~~~~~~~~^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 1203, in read
+    first_packet = self.connection._read_packet()
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 782, in _read_packet
+    packet.raise_for_error()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.IntegrityError: (1062, "Duplicate entry 'Polo衫' for key 'uk_original_desc'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 1679, in execute
+    return execute_function(sql, *args)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor,
+        ^^^^^^^
+    ...<2 lines>...
+        context,
+        ^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\sqlalchemy\dialects\mysql\mysqldb.py", line 196, in do_executemany
+    rowcount = cursor.executemany(statement, parameters)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 182, in executemany
+    return self._do_execute_many(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        q_prefix,
+        ^^^^^^^^^
+    ...<4 lines>...
+        self._get_db().encoding,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 220, in _do_execute_many
+    rows += self.execute(sql + postfix)
+            ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 153, in execute
+    result = self._query(query)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\cursors.py", line 322, in _query
+    conn.query(q)
+    ~~~~~~~~~~^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 575, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 826, in _read_query_result
+    result.read()
+    ~~~~~~~~~~~^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 1203, in read
+    first_packet = self.connection._read_packet()
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\connections.py", line 782, in _read_packet
+    packet.raise_for_error()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pymysql\err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.IntegrityError: (pymysql.err.IntegrityError) (1062, "Duplicate entry 'Polo衫' for key 'uk_original_desc'")
+[SQL: INSERT INTO standard_knowledge_base (original_description, official_description, ccc_code, frequency) VALUES (%(original_description)s, %(official_description)s, %(ccc_code)s, %(frequency)s)]
+[parameters: [{'original_description': '户外椅子凳子', 'official_description': '椅子配件', 'ccc_code': '9402.10.92.00-3', 'frequency': 4}, {'original_description': '宝宝辅食机/料理机/食物搅拌器', 'official_description': '家用器具', 'ccc_code': '7321.89.90.00-3', 'frequency': 1}, {'original_description': 'USB风扇', 'official_description': '風扇配件', 'ccc_code': '8414.90.90.00-6', 'frequency': 25}, {'original_description': '手机贴膜', 'official_description': '膠膜', 'ccc_code': '3926.90.39.00-1', 'frequency': 19}, {'original_description': '汽车装饰贴/反光贴', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 4}, {'original_description': '智能手表', 'official_description': '手錶', 'ccc_code': '9101.19.90.00-0', 'frequency': 3}, {'original_description': '手机充电器', 'official_description': '充電器', 'ccc_code': '8504.40.20.00-3', 'frequency': 19}, {'original_description': '自拍杆/架', 'official_description': '架子', 'ccc_code': '8302.49.00.00-2', 'frequency': 4}  ... displaying 10 of 3205 total bound parameter sets ...  {'original_description': '車貼紙', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 1}, {'original_description': '二件套', 'official_description': 'SHIRT', 'ccc_code': '6110.20.00.00-1', 'frequency': 1}]]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\src\batch_train.py", line 145, in train_model
+    df_knowledge.to_sql('standard_knowledge_base', conn, if_exists='append', index=False)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\core\generic.py", line 3052, in to_sql
+    return sql.to_sql(
+           ~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<8 lines>...
+        method=method,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 841, in to_sql
+    return pandas_sql.to_sql(
+           ~~~~~~~~~~~~~~~~~^
+        frame,
+        ^^^^^^
+    ...<9 lines>...
+        **engine_kwargs,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 2037, in to_sql
+    total_inserted = sql_engine.insert_records(
+        table=table,
+    ...<7 lines>...
+        **engine_kwargs,
+    )
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 1571, in insert_records
+    return table.insert(chunksize=chunksize, method=method)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 1122, in insert
+    num_inserted = exec_insert(conn, keys, chunk_iter)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 1014, in _execute_insert
+    result = self.pd_sql.execute(self.table.insert(), data)
+  File "G:\我的雲端硬碟\SeaExpress_Automation_Project\SeaExpress_Core\venv\Lib\site-packages\pandas\io\sql.py", line 1681, in execute
+    raise DatabaseError(f"Execution failed on sql '{sql}': {exc}") from exc
+pandas.errors.DatabaseError: Execution failed on sql 'INSERT INTO standard_knowledge_base (original_description, official_description, ccc_code, frequency) VALUES (:original_description, :official_description, :ccc_code, :frequency)': (pymysql.err.IntegrityError) (1062, "Duplicate entry 'Polo衫' for key 'uk_original_desc'")
+[SQL: INSERT INTO standard_knowledge_base (original_description, official_description, ccc_code, frequency) VALUES (%(original_description)s, %(official_description)s, %(ccc_code)s, %(frequency)s)]
+[parameters: [{'original_description': '户外椅子凳子', 'official_description': '椅子配件', 'ccc_code': '9402.10.92.00-3', 'frequency': 4}, {'original_description': '宝宝辅食机/料理机/食物搅拌器', 'official_description': '家用器具', 'ccc_code': '7321.89.90.00-3', 'frequency': 1}, {'original_description': 'USB风扇', 'official_description': '風扇配件', 'ccc_code': '8414.90.90.00-6', 'frequency': 25}, {'original_description': '手机贴膜', 'official_description': '膠膜', 'ccc_code': '3926.90.39.00-1', 'frequency': 19}, {'original_description': '汽车装饰贴/反光贴', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 4}, {'original_description': '智能手表', 'official_description': '手錶', 'ccc_code': '9101.19.90.00-0', 'frequency': 3}, {'original_description': '手机充电器', 'official_description': '充電器', 'ccc_code': '8504.40.20.00-3', 'frequency': 19}, {'original_description': '自拍杆/架', 'official_description': '架子', 'ccc_code': '8302.49.00.00-2', 'frequency': 4}  ... displaying 10 of 3205 total bound parameter sets ...  {'original_description': '車貼紙', 'official_description': '貼紙', 'ccc_code': '4911.10.00.00-8', 'frequency': 1}, {'original_description': '二件套', 'official_description': 'SHIRT', 'ccc_code': '6110.20.00.00-1', 'frequency': 1}]]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-02-14 23:52:40,016 - INFO - 🚀 開始執行批次訓練 (Batch Training)...
+2026-02-14 23:52:40,022 - INFO - 正在讀取歷史資料 (Table A & Table B)...
+2026-02-14 23:52:54,141 - INFO - 總分提單數: A=2723, B=17678
+2026-02-14 23:52:54,142 - INFO - 符合「項次數量一致(1對1)」的有效訓練單數: 2702
+2026-02-14 23:52:54,191 - INFO - 正在進行知識萃取與多數決投票...
+2026-02-14 23:52:54,234 - INFO - 學習完成，共提取 3093 條標準知識。
+2026-02-14 23:52:54,341 - INFO - 正在清空標準知識庫 (TRUNCATE)...
+2026-02-14 23:52:54,447 - INFO - 正在寫入新訓練資料...
+2026-02-14 23:52:56,029 - INFO - ✅ 標準知識庫已更新完畢！
+2026-02-16 23:01:56,048 - INFO - 🚀 開始執行批次訓練 (Batch Training)...
+2026-02-16 23:01:56,049 - INFO - 正在讀取歷史資料 (Table A & Table B)...
+2026-02-16 23:02:24,289 - INFO - 總分提單數: A=256228, B=244254
+2026-02-16 23:02:24,290 - INFO - 符合「項次數量一致(1對1)」的有效訓練單數: 182165
+2026-02-16 23:02:28,417 - INFO - 正在進行知識萃取與多數決投票...
+2026-02-16 23:02:29,669 - INFO - 學習完成，共提取 30471 條標準知識。
+2026-02-16 23:02:29,730 - INFO - 偵測到舊資料 (3093 筆)，正在備份至 standard_knowledge_base_backup_20260216_230229 ...
+2026-02-16 23:02:29,801 - INFO - 備份完成。
+2026-02-16 23:02:29,801 - INFO - 正在清空標準知識庫 (TRUNCATE)...
+2026-02-16 23:02:29,817 - INFO - 正在寫入新訓練資料...
+2026-02-16 23:02:30,844 - INFO - ✅ 標準知識庫已更新完畢！

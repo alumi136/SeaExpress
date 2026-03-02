@@ -1,0 +1,17 @@
+# Python 虛擬環境與快取
+venv/
+__pycache__/
+*.pyc
+
+# 環境變數與機密資訊
+.env
+
+# 資料庫檔案
+*.db
+*.sqlite3
+
+# 上傳的暫存檔案
+uploads/
+
+# VS Code 設定
+.vscode/

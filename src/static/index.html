@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海快報關自動化系統</title>
+    
+    <!-- 引入字型與套件 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Tailwind (Shadcn UI) 主題設定 -->
+    <script>
+        tailwind.config = {
+            darkMode: ["class"],
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        border: "hsl(214.3 31.8% 91.4%)", background: "hsl(0 0% 100%)", foreground: "hsl(222.2 84% 4.9%)",
+                        primary: { DEFAULT: "hsl(221.2 83.2% 53.3%)", foreground: "hsl(210 40% 98%)" },
+                        secondary: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(222.2 47.4% 11.2%)" },
+                        destructive: { DEFAULT: "hsl(0 84.2% 60.2%)", foreground: "hsl(210 40% 98%)" },
+                        muted: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(215.4 16.3% 46.9%)" },
+                        card: { DEFAULT: "hsl(0 0% 100%)", foreground: "hsl(222.2 84% 4.9%)" },
+                    },
+                    borderRadius: { lg: "0.5rem", md: "calc(0.5rem - 2px)", sm: "calc(0.5rem - 4px)" }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: hsl(222.2 84% 4.9%); }
+        .hidden-view { display: none !important; }
+        
+        /* 表單元件樣式 */
+        .shadcn-input { display: flex; height: 2.5rem; width: 100%; border-radius: 0.375rem; border: 1px solid hsl(214.3 31.8% 91.4%); padding: 0.5rem 0.75rem; font-size: 0.875rem; transition: outline 0.2s, box-shadow 0.2s; }
+        .shadcn-input:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(221.2 83.2% 53.3%); }
+        .shadcn-input-sm { height: 2rem; padding: 0.25rem 0.5rem; }
+        
+        /* 按鈕樣式 */
+        .shadcn-button { display: inline-flex; align-items: center; justify-content: center; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; height: 2.5rem; padding: 0.5rem 1rem; cursor: pointer; transition: background-color 0.2s; }
+        .shadcn-button-primary { background-color: hsl(221.2 83.2% 53.3%); color: white; }
+        .shadcn-button-primary:hover { background-color: hsl(221.2 83.2% 53.3% / 0.9); }
+        .shadcn-button-outline { border: 1px solid hsl(214.3 31.8% 91.4%); background-color: white; }
+        .shadcn-button-outline:hover { background-color: hsl(210 40% 96.1%); }
+        
+        /* 表格樣式 */
+        .shadcn-table th { font-weight: 500; color: hsl(215.4 16.3% 46.9%); text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid hsl(214.3 31.8% 91.4%); }
+        .shadcn-table td { padding: 0.75rem 1rem; border-bottom: 1px solid hsl(214.3 31.8% 91.4%); font-size: 0.875rem; vertical-align: middle; }
+        .row-hover:hover { background-color: hsl(210 40% 96.1% / 0.5); cursor: pointer; }
+        
+        /* 其他特效 */
+        #global-loader { background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); z-index: 100; }
+        .chevron { transition: transform 0.2s; }
+        .expanded .chevron { transform: rotate(180deg); }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- ========================================== -->
+    <!-- 全螢幕 Loading 遮罩 -->
+    <!-- ========================================== -->
+    <div id="global-loader" class="hidden-view fixed inset-0 flex items-center justify-center flex-col">
+        <i data-lucide="loader-2" class="w-12 h-12 text-primary animate-spin mb-4"></i>
+        <h2 class="text-xl font-bold text-gray-800" id="loader-msg">正在處理資料中...</h2>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 視圖 1: 登入介面 -->
+    <!-- ========================================== -->
+    <div id="login-view" class="flex-1 flex items-center justify-center p-4">
+        <div class="w-full max-w-[400px] bg-card rounded-xl border border-border shadow-sm p-6">
+            <h3 class="font-semibold tracking-tight text-2xl text-center mb-1">系統登入</h3>
+            <p class="text-sm text-muted-foreground text-center mb-6">海快報關自動化作業平台</p>
+            <form id="loginForm" class="space-y-4">
+                <input id="username" type="text" placeholder="帳號" class="shadcn-input" required>
+                <input id="password" type="password" placeholder="密碼" class="shadcn-input" required>
+                <div id="loginError" class="text-sm text-destructive hidden text-center">帳號或密碼錯誤</div>
+                <button type="submit" id="loginBtn" class="shadcn-button shadcn-button-primary w-full">登 入</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 視圖 2: 主控台工作區 -->
+    <!-- ========================================== -->
+    <div id="dashboard-view" class="hidden-view flex-1 flex h-screen overflow-hidden">
+        
+        <!-- 左側選單 -->
+        <aside class="w-64 border-r border-border bg-card flex flex-col hidden md:flex">
+            <div class="h-14 flex items-center px-4 border-b border-border">
+                <i data-lucide="ship" class="w-6 h-6 mr-2 text-primary"></i>
+                <span class="font-bold text-lg tracking-tight">海快報關系統</span>
+            </div>
+            <nav class="flex-1 py-4 px-3 space-y-1">
+                <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-md bg-secondary text-secondary-foreground">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 mr-3"></i> 審單工作區
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主內容區 -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-background">
+            
+            <!-- 頂部導覽列 -->
+            <header class="h-14 flex items-center justify-between px-6 border-b border-border bg-card">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-lg font-semibold">審單工作區</h1>
+                    <div class="h-6 w-px bg-border"></div>
+                    <!-- MAWB 隔離下拉選單 -->
+                    <span class="text-sm font-medium text-muted-foreground mr-2">當前主單號：</span>
+                    <select id="mawbSelector" class="shadcn-input h-8 py-1 text-sm w-48 font-bold text-primary" onchange="fetchOrders()">
+                        <option value="">請選擇主單號...</option>
+                    </select>
+                    
+                    <!-- 主單統計摘要 -->
+                    <div id="mawb-summary" class="hidden flex space-x-3 ml-4 text-xs font-semibold">
+                        <span class="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md border border-blue-100 shadow-sm">分提單數量: <span id="summary-hawb-count">0</span></span>
+                        <span class="bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md border border-emerald-100 shadow-sm">總重量: <span id="summary-gw">0.0</span> kg</span>
+                        <span class="bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-md border border-amber-100 shadow-sm">總金額: <span id="summary-amount">0</span> TWD</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-muted-foreground" id="userGreeting"></span>
+                    <button onclick="logout()" class="shadcn-button shadcn-button-outline h-8 px-3 text-xs">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5 mr-1.5"></i> 登出
+                    </button>
+                </div>
+            </header>
+
+            <!-- 資料表格區 -->
+            <div class="flex-1 overflow-auto p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold tracking-tight text-gray-800">分提單列表 (HAWB)</h2>
+                    <div class="flex space-x-2">
+                        <!-- 匯出與匯入按鈕 -->
+                        <button onclick="exportExcel()" class="shadcn-button shadcn-button-outline border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                            <i data-lucide="download" class="w-4 h-4 mr-2"></i> 匯出標準報關單
+                        </button>
+                        <button onclick="openImportModal()" class="shadcn-button shadcn-button-primary">
+                            <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> 匯入 Excel 報表
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto max-h-[calc(100vh-220px)]">
+                        <table class="w-full shadcn-table text-left border-collapse">
+                            <thead class="bg-muted/50 whitespace-nowrap sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="w-10"></th>
+                                    <th class="w-24">狀態</th>
+                                    <th>分提單號 (HAWB)</th>
+                                    <th>品項數</th>
+                                    <th>收件人資訊</th>
+                                    <th>分單總額 (TWD)</th>
+                                    <th>警報摘要</th>
+                                    <th class="text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                <!-- 由 JS 動態渲染手風琴表格 -->
+                                <tr><td colspan="8" class="text-center py-10 text-muted-foreground">請先由左上角選擇主單號 (MAWB)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 視圖 3: 進階匯入設定視窗 -->
+    <!-- ========================================== -->
+    <div id="import-modal" class="hidden-view fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeImportModal()"></div>
+        <div class="relative bg-card w-full max-w-md rounded-xl shadow-lg border border-border p-6">
+            <h3 class="text-lg font-bold mb-4">匯入報關 Excel</h3>
+            <form id="importForm" class="space-y-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">請選擇檔案</label>
+                    <input type="file" id="importFile" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" required accept=".xlsx,.xls,.csv">
+                </div>
+                
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">匯入模式</label>
+                    <select id="importMode" class="shadcn-input" onchange="toggleImportMode()">
+                        <option value="NEW">建立全新主單 (建立新 MAWB)</option>
+                        <option value="APPEND">附加至現存主單 (阻擋重複 HAWB)</option>
+                    </select>
+                </div>
+                
+                <div class="space-y-2" id="divNewMawb">
+                    <label class="text-sm font-medium text-primary">自訂新主單號碼 (MAWB)</label>
+                    <input type="text" id="newMawbInput" class="shadcn-input" placeholder="留白則自動使用檔名">
+                </div>
+                
+                <div class="space-y-2 hidden" id="divExistMawb">
+                    <label class="text-sm font-medium text-amber-600">選擇目標主單號</label>
+                    <select id="existMawbSelect" class="shadcn-input"></select>
+                </div>
+                
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeImportModal()" class="shadcn-button shadcn-button-outline">取消</button>
+                    <button type="submit" class="shadcn-button shadcn-button-primary">開始匯入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 視圖 4: 雙層人工修改視窗 (HAWB-centric) -->
+    <!-- ========================================== -->
+    <div id="edit-modal" class="hidden-view fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="relative bg-card w-full max-w-6xl rounded-xl shadow-xl border border-border flex flex-col max-h-[90vh]">
+            
+            <div class="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/30">
+                <div>
+                    <h3 class="text-xl font-bold tracking-tight text-foreground flex items-center">
+                        <i data-lucide="edit-3" class="w-5 h-5 mr-2 text-primary"></i> 人工修改與放行
+                    </h3>
+                    <p class="text-sm text-muted-foreground mt-1" id="edit-subtitle">分提單號: HAWB_XXX</p>
+                </div>
+                <button onclick="closeEditModal()" class="text-muted-foreground hover:text-foreground bg-white rounded-full p-1 shadow-sm"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <!-- 警告區 -->
+                <div id="edit-warnings" class="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600 hidden"></div>
+
+                <form id="editForm">
+                    <input type="hidden" id="edit_mawb">
+                    <input type="hidden" id="edit_hawb">
+                    
+                    <!-- 上層：HAWB 共用資訊 -->
+                    <div class="bg-blue-50/30 p-4 rounded-lg border border-blue-100 mb-6">
+                        <h4 class="text-sm font-bold text-blue-800 mb-3 flex items-center"><i data-lucide="user" class="w-4 h-4 mr-1"></i> 分提單共用資訊</h4>
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="space-y-1"><label class="text-xs font-medium text-muted-foreground">收件人姓名</label><input id="edit_cne_name" type="text" class="shadcn-input shadcn-input-sm bg-white"></div>
+                            <div class="space-y-1"><label class="text-xs font-medium text-muted-foreground">收件電話</label><input id="edit_cne_phone" type="text" class="shadcn-input shadcn-input-sm bg-white"></div>
+                            <div class="space-y-1 col-span-2"><label class="text-xs font-medium text-muted-foreground">收件地址</label><input id="edit_cne_addr" type="text" class="shadcn-input shadcn-input-sm bg-white"></div>
+                            <div class="space-y-1"><label class="text-xs font-medium text-muted-foreground">總毛重 (kg)</label><input id="edit_gw" type="number" step="0.01" class="shadcn-input shadcn-input-sm bg-white"></div>
+                            <div class="space-y-1"><label class="text-xs font-medium text-muted-foreground">總箱數</label><input id="edit_cartons" type="number" step="0.01" class="shadcn-input shadcn-input-sm bg-white"></div>
+                        </div>
+                    </div>
+
+                    <!-- 下層：Items 明細表格 -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-700 mb-2 flex items-center"><i data-lucide="box" class="w-4 h-4 mr-1"></i> 貨品項次明細</h4>
+                        <div class="border border-border rounded-md overflow-hidden">
+                            <table class="w-full text-left text-sm border-collapse bg-white">
+                                <thead class="bg-muted/50 text-xs">
+                                    <tr>
+                                        <!-- 放寬表頭的寬度設定，確保欄位不被擠壓 -->
+                                        <th class="p-2 border-b w-10 text-center">項次</th>
+                                        <th class="p-2 border-b w-[20%] min-w-[120px]">原始品名 (可改)</th>
+                                        <th class="p-2 border-b w-[18%] min-w-[100px]">通關品名</th>
+                                        <th class="p-2 border-b w-[15%] min-w-[110px]">稅則號列 (11碼)</th>
+                                        <th class="p-2 border-b w-[9%] min-w-[70px]">數量</th>
+                                        <th class="p-2 border-b w-[10%] min-w-[80px] text-amber-600 font-bold">單價</th>
+                                        <th class="p-2 border-b w-[10%] min-w-[90px]">總金額</th>
+                                        <th class="p-2 border-b w-[8%] min-w-[70px]">淨重</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editItemsTbody">
+                                    <!-- 由 JS 動態生成項目輸入框 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="px-6 py-4 border-t border-border bg-muted/20 flex justify-end space-x-3">
+                <button type="button" onclick="closeEditModal()" class="shadcn-button shadcn-button-outline bg-white">取消</button>
+                <button type="button" id="btnSaveEdit" onclick="submitEdit()" class="shadcn-button shadcn-button-primary">
+                    <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i> 儲存並放行全單
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 前端核心邏輯 (JavaScript) -->
+    <!-- ========================================== -->
+    <script>
+        lucide.createIcons();
+        const views = { login: document.getElementById('login-view'), dashboard: document.getElementById('dashboard-view') };
+        let hawbGroups = []; // 暫存目前畫面上的 HAWB 群組資料
+
+        // --- 1. 登入與權限驗證 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('access_token');
+            if (token) verifyToken(token);
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            btn.innerHTML = '登入中...'; btn.disabled = true;
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', document.getElementById('username').value);
+                formData.append('password', document.getElementById('password').value);
+                const res = await fetch('/api/login', { method: 'POST', body: formData });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('access_token', data.access_token);
+                    verifyToken(data.access_token);
+                } else document.getElementById('loginError').classList.remove('hidden');
+            } catch (err) { alert('伺服器錯誤'); }
+            finally { btn.innerHTML = '登 入'; btn.disabled = false; }
+        });
+
+        async function verifyToken(token) {
+            try {
+                const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const user = await res.json();
+                    views.login.classList.add('hidden-view'); 
+                    views.dashboard.classList.remove('hidden-view');
+                    document.getElementById('userGreeting').textContent = `${user.username}`;
+                    loadMawbList(); // 登入成功後，載入 MAWB 列表
+                } else logout();
+            } catch { logout(); }
+        }
+
+        function logout() {
+            localStorage.removeItem('access_token');
+            views.dashboard.classList.add('hidden-view'); 
+            views.login.classList.remove('hidden-view');
+        }
+
+        function showLoader(msg="處理中...") {
+            document.getElementById('loader-msg').textContent = msg;
+            document.getElementById('global-loader').classList.remove('hidden-view');
+        }
+        function hideLoader() { document.getElementById('global-loader').classList.add('hidden-view'); }
+
+        // --- 匯出 Excel 功能 ---
+        async function exportExcel() {
+            const mawb = document.getElementById('mawbSelector').value;
+            if (!mawb) {
+                alert('請先由左上角選擇要匯出的主單號 (MAWB)！');
+                return;
+            }
+
+            // 檢查是否有未處理的異常
+            const hasErrors = hawbGroups.some(g => g.processing_status !== 'PROCESSED');
+            if (hasErrors) {
+                if (!confirm('⚠️ 注意：目前尚有【需人工介入】的紅燈/黃燈異常未處理！\n\n您確定要強制匯出嗎？')) {
+                    return;
+                }
+            }
+
+            showLoader("正在產出標準報關 Excel...");
+            const token = localStorage.getItem('access_token');
+            
+            try {
+                const res = await fetch(`/api/export/${mawb}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `海快報關資料_${mawb}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const err = await res.json();
+                    alert("❌ 匯出失敗: " + (err.detail || '未知錯誤'));
+                }
+            } catch (e) {
+                alert("伺服器連線發生錯誤");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // --- 2. MAWB 下拉選單處理 ---
+        async function loadMawbList(selectMawb = null) {
+            const token = localStorage.getItem('access_token');
+            const res = await fetch('/api/mawbs', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const mawbs = await res.json();
+                const sel = document.getElementById('mawbSelector');
+                const existSel = document.getElementById('existMawbSelect');
+                
+                sel.innerHTML = '<option value="">請選擇主單號...</option>';
+                existSel.innerHTML = '';
+                
+                mawbs.forEach(m => {
+                    sel.innerHTML += `<option value="${m}">${m}</option>`;
+                    existSel.innerHTML += `<option value="${m}">${m}</option>`;
+                });
+                
+                if (selectMawb && mawbs.includes(selectMawb)) {
+                    sel.value = selectMawb;
+                    fetchOrders(); // 自動觸發載入資料
+                }
+            }
+        }
+
+        async function fetchOrders() {
+            const mawb = document.getElementById('mawbSelector').value;
+            const tbody = document.getElementById('ordersTableBody');
+            const summaryDiv = document.getElementById('mawb-summary');
+            
+            if (!mawb) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-muted-foreground">請先由左上角選擇主單號 (MAWB)</td></tr>';
+                summaryDiv.classList.add('hidden'); // 隱藏摘要
+                return;
+            }
+
+            const token = localStorage.getItem('access_token');
+            const res = await fetch(`/api/orders?mawb_no=${mawb}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                hawbGroups = await res.json();
+                
+                // 計算並更新統計摘要
+                const hawbCount = hawbGroups.length;
+                const totalGw = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.gross_weight) || 0), 0);
+                const totalAmount = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.total_amount) || 0), 0);
+                
+                document.getElementById('summary-hawb-count').textContent = hawbCount;
+                document.getElementById('summary-gw').textContent = totalGw.toFixed(2);
+                document.getElementById('summary-amount').textContent = totalAmount.toLocaleString();
+                summaryDiv.classList.remove('hidden'); // 顯示摘要
+
+                renderAccordionTable();
+            }
+        }
+
+        // --- 3. 渲染手風琴表格 ---
+        function renderAccordionTable() {
+            const tbody = document.getElementById('ordersTableBody');
+            tbody.innerHTML = '';
+            
+            if (hawbGroups.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-muted-foreground">此主單目前無資料。</td></tr>`;
+                return;
+            }
+
+            hawbGroups.forEach((group, index) => {
+                // 狀態標籤
+                let statusHtml = group.processing_status === 'PROCESSED' 
+                    ? `<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">已處理</span>`
+                    : `<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-200">需人工介入</span>`;
+
+                // 收件人資訊組合
+                let cneInfo = (group.consignee_name || '無姓名') + 
+                              (group.consignee_phone ? ` <span class="text-muted-foreground">(${group.consignee_phone})</span>` : '');
+
+                // 警告標籤
+                let warnHtml = group.warnings.length > 0 
+                    ? `<span class="text-xs text-red-600 font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline"></i> 包含 ${group.warnings.length} 項警報</span>` 
+                    : '-';
+
+                // 建立主單行 (HAWB Row)
+                const trMaster = document.createElement('tr');
+                trMaster.className = 'row-hover border-b border-border ' + (group.processing_status !== 'PROCESSED' ? 'bg-red-50/20' : '');
+                trMaster.onclick = () => toggleAccordion(index);
+                trMaster.innerHTML = `
+                    <td class="text-muted-foreground text-center" id="icon-${index}"><i data-lucide="chevron-down" class="w-4 h-4 chevron inline-block"></i></td>
+                    <td>${statusHtml}</td>
+                    <td class="font-bold text-primary">${group.hawb_no}</td>
+                    <td class="font-medium">${group.items.length} 項</td>
+                    <td class="text-sm truncate max-w-[200px]" title="${group.consignee_address}">${cneInfo}</td>
+                    <td class="font-medium">${group.total_amount.toLocaleString()}</td>
+                    <td>${warnHtml}</td>
+                    <td class="text-right">
+                        ${group.processing_status !== 'PROCESSED' 
+                            ? `<button onclick="event.stopPropagation(); openEditModal('${group.hawb_no}')" class="shadcn-button shadcn-button-outline h-7 px-3 text-xs border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm">人工修改</button>` 
+                            : `<button class="text-primary hover:underline text-sm font-medium">檢視</button>`}
+                    </td>
+                `;
+                tbody.appendChild(trMaster);
+
+                // 建立明細子表格 (Items Detail Row) - 預設隱藏
+                const trDetail = document.createElement('tr');
+                trDetail.id = `detail-${index}`;
+                trDetail.className = 'hidden bg-slate-50/80 border-b border-border';
+                
+                let subTableRows = group.items.map(item => `
+                    <tr class="border-b border-gray-200 last:border-0 hover:bg-white">
+                        <td class="py-2 px-3 text-muted-foreground w-12 text-center">${item.item_no}</td>
+                        <td class="py-2 px-3 max-w-[150px] truncate" title="${item.description_original}">${item.description_original}</td>
+                        <td class="py-2 px-3 text-blue-700">${item.description_official || '-'}</td>
+                        <td class="py-2 px-3 font-mono text-xs">${item.ccc_code || '<span class="text-red-400">無</span>'}</td>
+                        <td class="py-2 px-3">${item.qty}</td>
+                        <td class="py-2 px-3">${item.unit_price}</td>
+                        <td class="py-2 px-3">${item.total_amount}</td>
+                    </tr>
+                `).join('');
+
+                trDetail.innerHTML = `
+                    <td colspan="8" class="p-0">
+                        <div class="p-4 pl-12 shadow-inner">
+                            <table class="w-full text-sm text-left bg-white rounded-md border border-gray-200 shadow-sm">
+                                <thead class="bg-gray-100 text-xs text-gray-500">
+                                    <tr><th class="py-2 px-3">項次</th><th class="py-2 px-3">原始品名</th><th class="py-2 px-3">通關品名</th><th class="py-2 px-3">稅則號</th><th class="py-2 px-3">數量</th><th class="py-2 px-3">單價</th><th class="py-2 px-3">總價</th></tr>
+                                </thead>
+                                <tbody>${subTableRows}</tbody>
+                            </table>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(trDetail);
+            });
+            lucide.createIcons();
+        }
+
+        function toggleAccordion(index) {
+            const detailRow = document.getElementById(`detail-${index}`);
+            const iconCell = document.getElementById(`icon-${index}`);
+            if (detailRow.classList.contains('hidden')) {
+                detailRow.classList.remove('hidden');
+                iconCell.classList.add('expanded');
+            } else {
+                detailRow.classList.add('hidden');
+                iconCell.classList.remove('expanded');
+            }
+        }
+
+        // --- 4. 進階匯入對話框處理 ---
+        function openImportModal() {
+            document.getElementById('import-modal').classList.remove('hidden-view');
+            document.getElementById('importFile').value = '';
+            toggleImportMode();
+        }
+        function closeImportModal() { document.getElementById('import-modal').classList.add('hidden-view'); }
+        
+        function toggleImportMode() {
+            const mode = document.getElementById('importMode').value;
+            if (mode === 'NEW') {
+                document.getElementById('divNewMawb').classList.remove('hidden');
+                document.getElementById('divExistMawb').classList.add('hidden');
+            } else {
+                document.getElementById('divNewMawb').classList.add('hidden');
+                document.getElementById('divExistMawb').classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('importForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = document.getElementById('importFile').files[0];
+            const mode = document.getElementById('importMode').value;
+            let mawb = mode === 'NEW' ? document.getElementById('newMawbInput').value : document.getElementById('existMawbSelect').value;
+            
+            if (!mawb && mode === 'NEW') mawb = file.name.split('.')[0].toUpperCase();
+            if (!mawb) { alert('無法取得主單號'); return; }
+
+            closeImportModal();
+            showLoader("上傳與 AI 審核中...");
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('mawb_no', mawb);
+            formData.append('import_mode', mode);
+
+            try {
+                const token = localStorage.getItem('access_token');
+                const res = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
+                if (res.ok) {
+                    await loadMawbList(mawb); // 上傳成功，重新載入 MAWB 列表並切換
+                } else {
+                    const err = await res.json();
+                    alert("❌ 匯入失敗: \n" + (err.detail || '未知錯誤'));
+                }
+            } catch(e) { alert("連線錯誤"); }
+            finally { hideLoader(); }
+        });
+
+        // --- 5. 人工修改與放行視窗 ---
+        function openEditModal(hawbNo) {
+            const group = hawbGroups.find(g => g.hawb_no === hawbNo);
+            if (!group) return;
+
+            document.getElementById('edit_mawb').value = group.mawb_no;
+            document.getElementById('edit_hawb').value = group.hawb_no;
+            document.getElementById('edit-subtitle').textContent = `主單: ${group.mawb_no} | 分單: ${group.hawb_no}`;
+            
+            // 填寫上半部 (HAWB 共用資訊)
+            document.getElementById('edit_cne_name').value = group.consignee_name || '';
+            document.getElementById('edit_cne_phone').value = group.consignee_phone || '';
+            document.getElementById('edit_cne_addr').value = group.consignee_address || '';
+            document.getElementById('edit_gw').value = group.gross_weight || '';
+            document.getElementById('edit_cartons').value = group.cartons || '';
+
+            // 處理警告訊息顯示
+            const warnDiv = document.getElementById('edit-warnings');
+            if (group.warnings.length > 0) {
+                warnDiv.innerHTML = '<strong class="block mb-1">系統阻擋原因：</strong><ul class="list-disc ml-5">' + 
+                    group.warnings.map(w => `<li>${w}</li>`).join('') + '</ul>';
+                warnDiv.classList.remove('hidden');
+            } else { warnDiv.classList.add('hidden'); }
+
+            // 渲染下半部 (Items 表格輸入框) - 已優化寬度與對齊
+            const tbody = document.getElementById('editItemsTbody');
+            tbody.innerHTML = '';
+            group.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-1 border-b text-center text-muted-foreground">${item.item_no}
+                        <input type="hidden" class="i-id" value="${item.id}">
+                    </td>
+                    <td class="p-1 border-b"><input type="text" class="i-desc-orig shadcn-input shadcn-input-sm w-full border-blue-200 text-xs" value="${item.description_original || ''}"></td>
+                    <td class="p-1 border-b"><input type="text" class="i-desc-offi shadcn-input shadcn-input-sm w-full text-xs" value="${item.description_official || ''}"></td>
+                    <td class="p-1 border-b"><input type="text" class="i-ccc shadcn-input shadcn-input-sm w-full font-mono text-xs" value="${item.ccc_code || ''}"></td>
+                    <td class="p-1 border-b"><input type="number" step="0.01" class="i-qty shadcn-input shadcn-input-sm w-full text-right" value="${item.qty || 0}" oninput="calcRowTotal(this)"></td>
+                    <td class="p-1 border-b"><input type="number" step="0.01" class="i-price shadcn-input shadcn-input-sm w-full border-amber-300 bg-amber-50 text-right" value="${item.unit_price || 0}" oninput="calcRowTotal(this)"></td>
+                    <td class="p-1 border-b"><input type="number" step="0.01" class="i-total shadcn-input shadcn-input-sm w-full bg-gray-100 font-medium text-right" value="${item.total_amount || 0}" readonly></td>
+                    <td class="p-1 border-b"><input type="number" step="0.01" class="i-nw shadcn-input shadcn-input-sm w-full text-right" value="${item.net_weight || ''}"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('edit-modal').classList.remove('hidden-view');
+        }
+
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden-view'); }
+
+        // 即時計算小計
+        function calcRowTotal(element) {
+            const tr = element.closest('tr');
+            const qty = parseFloat(tr.querySelector('.i-qty').value) || 0;
+            const price = parseFloat(tr.querySelector('.i-price').value) || 0;
+            tr.querySelector('.i-total').value = Math.floor(qty * price);
+        }
+
+        // 送出修改資料
+        async function submitEdit() {
+            const btn = document.getElementById('btnSaveEdit');
+            btn.innerHTML = '儲存中...'; btn.disabled = true;
+            
+            const hawbNo = document.getElementById('edit_hawb').value;
+            
+            // 收集所有 Items 的資料
+            const itemsData = [];
+            document.querySelectorAll('#editItemsTbody tr').forEach(tr => {
+                itemsData.push({
+                    id: parseInt(tr.querySelector('.i-id').value),
+                    description_original: tr.querySelector('.i-desc-orig').value,
+                    description_official: tr.querySelector('.i-desc-offi').value || null,
+                    ccc_code: tr.querySelector('.i-ccc').value || null,
+                    qty: parseFloat(tr.querySelector('.i-qty').value) || 0,
+                    unit_price: parseFloat(tr.querySelector('.i-price').value) || 0,
+                    total_amount: parseFloat(tr.querySelector('.i-total').value) || 0,
+                    net_weight: parseFloat(tr.querySelector('.i-nw').value) || null
+                });
+            });
+
+            // 組合 Payload
+            const payload = {
+                mawb_no: document.getElementById('edit_mawb').value,
+                consignee_name: document.getElementById('edit_cne_name').value || null,
+                consignee_phone: document.getElementById('edit_cne_phone').value || null,
+                consignee_address: document.getElementById('edit_cne_addr').value || null,
+                gross_weight: parseFloat(document.getElementById('edit_gw').value) || null,
+                cartons: parseFloat(document.getElementById('edit_cartons').value) || null,
+                items: itemsData
+            };
+
+            try {
+                const token = localStorage.getItem('access_token');
+                const res = await fetch(`/api/hawb/${hawbNo}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    closeEditModal();
+                    fetchOrders(); // 修改成功後重新抓取當前 MAWB 資料更新畫面
+                } else {
+                    const err = await res.json();
+                    alert("❌ 儲存失敗: " + (err.detail || '未知錯誤'));
+                }
+            } catch (error) { alert("伺服器連線發生錯誤"); }
+            finally { 
+                btn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 mr-2"></i> 儲存並放行全單'; 
+                btn.disabled = false; 
+                lucide.createIcons(); 
+            }
+        }
+    </script>
+</body>
+</html>
