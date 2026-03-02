@@ -68,6 +68,61 @@ class SeaExpressEngine:
         if len(clean_str) != 11: return clean_str, False
         return f"{clean_str[:4]}.{clean_str[4:6]}.{clean_str[6:8]}.{clean_str[8:10]}-{clean_str[10]}", True
 
+    # ==========================================
+    # 新增：欄位驗證與格式化輔助函式
+    # ==========================================
+    def clean_and_validate_phone(self, phone_str):
+        """清洗並驗證電話號碼 (過濾符號，檢查 09 或 0 開頭)"""
+        if not phone_str or pd.isna(phone_str): 
+            return "", True
+            
+        # 解決 Pandas 將數字當作浮點數讀取的問題 (例如 930575091.0)
+        phone_str = str(phone_str).strip()
+        if phone_str.endswith('.0'):
+            phone_str = phone_str[:-2]
+            
+        # 去除所有空白、短橫線、括號
+        clean_phone = re.sub(r'[\s\-\(\)]', '', phone_str)
+        if not clean_phone:
+            return "", True
+            
+        # 如果是 9 開頭的 9 碼數字，自動補 0
+        if len(clean_phone) == 9 and clean_phone.startswith('9'):
+            clean_phone = '0' + clean_phone
+            
+        # 驗證: 0開頭，且總長度至少為9-10碼的純數字
+        if re.match(r'^0\d{8,9}$', clean_phone):
+            return clean_phone, True
+        return clean_phone, False
+
+    def validate_vat_id(self, vat_str):
+        """驗證並格式化身分證與統編"""
+        if not vat_str or pd.isna(vat_str): 
+            return "", True
+            
+        # 解決 Pandas 將數字統編當作浮點數讀取的問題 (例如 80022153.0)
+        vat_str = str(vat_str).strip()
+        if vat_str.endswith('.0'):
+            vat_str = vat_str[:-2]
+            
+        # 自動轉大寫並去除前後空白
+        clean_vat = vat_str.upper()
+        if not clean_vat:
+            return "", True
+            
+        # 檢查身分證 (1英文字母+9數字) 或 統編 (8數字)
+        if re.match(r'^[A-Z]\d{9}$', clean_vat) or re.match(r'^\d{8}$', clean_vat):
+            return clean_vat, True
+        return clean_vat, False
+
+    def normalize_for_tracking(self, text_str):
+        """將字串忽略大小寫並去除所有空白，用於化整為零追蹤"""
+        if not text_str or pd.isna(text_str): 
+            return ""
+        return re.sub(r'\s+', '', str(text_str)).upper()
+
+    # ==========================================
+    
     def _find_col(self, columns, keywords, exclude_words=None):
         exclude_words = exclude_words or []
         for i, col in enumerate(columns):
@@ -99,7 +154,6 @@ class SeaExpressEngine:
         df = pd.read_excel(filepath, header=header_idx)
         columns = df.columns.tolist()
         
-        # --- 動態定位所有新增欄位 ---
         idx = {
             'hawb': self._find_col(columns, ['分提單']),
             'item': self._find_col(columns, ['貨物編號', '項次']),
@@ -117,15 +171,12 @@ class SeaExpressEngine:
             'trade_term': self._find_col(columns, ['交易條件']),
             'origin': self._find_col(columns, ['生產國別', '產地']),
             'marks': self._find_col(columns, ['標記', 'marks']),
-            
             'cartons': self._find_col(columns, ['總件數', '件數', '箱數'], exclude_words=['單位']),
             'ctn_unit': self._find_col(columns, ['件數單位']),
             'courier_vat': self._find_col(columns, ['快遞業者統一編號']),
-            
             'shp_name': self._find_col(columns, ['寄件人英文名稱', '寄件人名稱']),
             'shp_phone': self._find_col(columns, ['寄件人電話']),
             'shp_addr': self._find_col(columns, ['寄件人英文地址', '寄件人地址']),
-            
             'cne_name': self._find_col(columns, ['收貨人英文名稱']),
             'cne_name_ch': self._find_col(columns, ['收貨人中文名稱']),
             'cne_addr': self._find_col(columns, ['收貨人英文地址']),
@@ -133,7 +184,6 @@ class SeaExpressEngine:
             'cne_phone': self._find_col(columns, ['收貨人電話', '收件電話']),
             'cne_vat': self._find_col(columns, ['收貨人統一編號', '統編']),
             'cne_id_type': self._find_col(columns, ['收貨人身分識別碼']),
-            
             'manifest': self._find_col(columns, ['艙單號碼', '裝貨單號碼']),
             'container': self._find_col(columns, ['貨櫃資料']),
             'tax_note': self._find_col(columns, ['申報繳納稅款']),
@@ -146,7 +196,13 @@ class SeaExpressEngine:
         current_hawb = None
         
         def get_str(row, i): 
-            return str(row.iloc[i]).strip() if i is not None and pd.notna(row.iloc[i]) else ""
+            if i is None or pd.isna(row.iloc[i]):
+                return ""
+            val = str(row.iloc[i]).strip()
+            # 修正 Pandas 自動將純數字字串轉為浮點數的問題 (例如 930575091.0 -> 930575091)
+            if val.endswith('.0') and val[:-2].isdigit():
+                val = val[:-2]
+            return val
             
         def get_float(row, i):
             try:
@@ -170,13 +226,11 @@ class SeaExpressEngine:
             item_no_val = get_str(row, idx['item'])
             parsed_item_no = int(float(item_no_val)) if item_no_val and item_no_val.replace('.', '', 1).isdigit() else 0
 
-            # 抓取所有欄位並存入 Dictionary
             item_data = {'hawb_no': current_hawb, 'item_no': parsed_item_no, 'description_original': desc_val}
             for key in idx:
                 if key not in ['hawb', 'item', 'desc']:
                     item_data[key] = get_float(row, idx[key]) if key in ['qty', 'price', 'total', 'nw', 'gw', 'cartons'] else get_str(row, idx[key])
             
-            # 若欄位未區分中英文，回退補齊
             if not item_data['cne_name'] and idx['cne_name'] is None: 
                 item_data['cne_name'] = self._find_col_fallback(row, columns, ['收件人', '收貨人'])
             if not item_data['cne_addr'] and idx['cne_addr'] is None: 
@@ -195,6 +249,7 @@ class SeaExpressEngine:
         hawb_net_weights = defaultdict(float)
         hawb_gross_weights = defaultdict(float)
 
+        # 第一階段：逐項次處理
         for item in raw_data:
             hawb = item['hawb_no']
             desc = item['description_original']
@@ -208,12 +263,11 @@ class SeaExpressEngine:
             if item['gw'] > hawb_gross_weights[hawb]: 
                 hawb_gross_weights[hawb] = item['gw']
             
-            # 1. AI 知識庫比對
+            # AI 知識庫比對
             clean_desc = self._normalize_text(desc)
             pred = self.knowledge_base.get(clean_desc)
             official_desc = pred['official'] if pred else None
 
-            # 2. 稅則號邏輯：優先使用 Excel，若無則使用 AI
             client_ccc = item.get('ccc')
             final_ccc = None
             
@@ -249,11 +303,21 @@ class SeaExpressEngine:
             if new_total != raw_total or raw_price != new_price:
                 warnings.append(f"金額已校正 (原單價:{raw_price}, 原總價:{raw_total} -> 新單價:{new_price}, 新總價:{new_total})")
 
-            if new_price < 10:
+            # --- 電話格式清洗與驗證 ---
+            clean_phone, is_phone_valid = self.clean_and_validate_phone(item.get('cne_phone'))
+            if item.get('cne_phone') and not is_phone_valid:
                 status = "MANUAL_REQUIRED"
-                warnings.append(f"單價過低 (<10元): 目前為 {new_price}元")
+                warnings.append(f"收件電話格式異常: {item.get('cne_phone')}")
+            item['cne_phone'] = clean_phone
 
-            # 建立 ORM (包含所有新增欄位)
+            # --- 統編/身分證格式驗證 ---
+            clean_vat, is_vat_valid = self.validate_vat_id(item.get('cne_vat'))
+            if item.get('cne_vat') and not is_vat_valid:
+                status = "MANUAL_REQUIRED"
+                warnings.append(f"收貨人統編/身分證格式異常: {item.get('cne_vat')}")
+            item['cne_vat'] = clean_vat
+
+            # 建立 ORM
             order = SeaExpressOrder(
                 mawb_no=mawb_no, hawb_no=hawb, item_no=final_item_no,
                 description_original=desc, description_official=official_desc, ccc_code=final_ccc,
@@ -261,25 +325,27 @@ class SeaExpressEngine:
                 unit_price=new_price, currency=item['currency'], total_amount=new_total,
                 net_weight=item['nw'] if item['nw'] > 0 else None, gross_weight=item['gw'] if item['gw'] > 0 else None,
                 trade_term=item['trade_term'], origin_country=item['origin'], marks=item['marks'],
-                
                 cartons=item['cartons'] if item['cartons'] > 0 else None, ctn_unit=item['ctn_unit'],
                 courier_vat_no=item['courier_vat'],
-                
                 shipper_name=item['shp_name'], shipper_phone=item['shp_phone'], shipper_address=item['shp_addr'],
                 consignee_name=item['cne_name'], consignee_name_ch=item['cne_name_ch'],
                 consignee_address=item['cne_addr'], consignee_address_ch=item['cne_addr_ch'],
                 consignee_phone=item['cne_phone'], consignee_vat_no=item['cne_vat'], consignee_id_type=item['cne_id_type'],
-                
                 manifest_no=item['manifest'], container_data=item['container'], tax_payment_note=item['tax_note'],
                 remark=item['remark'], tracking_no_logistics=item['logistics_no'], tracking_no_711=item['no_711'],
-                
                 processing_status=status, warnings=warnings
             )
             orders.append(order)
             hawb_groups[hawb].append(order)
             
-            if item['cne_name']: consignee_tracker[f"NAME:{item['cne_name']}"].add(hawb)
-            if item['cne_addr']: consignee_tracker[f"ADDR:{item['cne_addr']}"].add(hawb)
+            # --- 追蹤化整為零：去除空白並統一轉大寫 ---
+            norm_name = self.normalize_for_tracking(item.get('cne_name'))
+            norm_addr = self.normalize_for_tracking(item.get('cne_addr'))
+            norm_vat = self.normalize_for_tracking(item.get('cne_vat'))
+            
+            if norm_name: consignee_tracker[f"NAME:{norm_name}"].add(hawb)
+            if norm_addr: consignee_tracker[f"ADDR:{norm_addr}"].add(hawb)
+            if norm_vat: consignee_tracker[f"VAT:{norm_vat}"].add(hawb)
 
         # 第二階段：HAWB 彙總與驗證
         for hawb, items in hawb_groups.items():
@@ -311,16 +377,41 @@ class SeaExpressEngine:
             if any(i.processing_status == "MANUAL_REQUIRED" for i in items):
                 for i in items: i.processing_status = "MANUAL_REQUIRED"
 
-        # 第三階段
-        suspicious_names = [k for k, v in consignee_tracker.items() if k.startswith("NAME:") and len(v) >= 4]
-        suspicious_addrs = [k for k, v in consignee_tracker.items() if k.startswith("ADDR:") and len(v) >= 4]
+        # 第三階段：MAWB 化整為零防範 (降低門檻為 >= 3 件)
+        suspicious_names = {k: v for k, v in consignee_tracker.items() if k.startswith("NAME:") and len(v) >= 3}
+        suspicious_addrs = {k: v for k, v in consignee_tracker.items() if k.startswith("ADDR:") and len(v) >= 3}
+        suspicious_vats = {k: v for k, v in consignee_tracker.items() if k.startswith("VAT:") and len(v) >= 3}
         
         for order in orders:
-            if order.consignee_name and f"NAME:{order.consignee_name}" in suspicious_names:
-                order.warnings.append(f"收件人姓名異常重複: 該主單下有 {len(consignee_tracker[f'NAME:{order.consignee_name}'])} 張分單使用相同姓名")
-            if order.consignee_address and f"ADDR:{order.consignee_address}" in suspicious_addrs:
-                order.warnings.append(f"收件人地址異常重複: 該主單下有 {len(consignee_tracker[f'ADDR:{order.consignee_address}'])} 張分單使用相同地址")
+            norm_name = self.normalize_for_tracking(order.consignee_name)
+            norm_addr = self.normalize_for_tracking(order.consignee_address)
+            norm_vat = self.normalize_for_tracking(order.consignee_vat_no)
+            
+            # 使用 Set 避免同一個 HAWB 的多個 Items 被重複寫入同一條警告
+            added_warnings = set() 
+            
+            if norm_name and f"NAME:{norm_name}" in suspicious_names:
+                msg = f"相同收件人超過{len(suspicious_names[f'NAME:{norm_name}'])}件 (姓名重複)"
+                if msg not in added_warnings:
+                    order.warnings.append(msg)
+                    added_warnings.add(msg)
+                    order.processing_status = "MANUAL_REQUIRED"
+                    
+            if norm_addr and f"ADDR:{norm_addr}" in suspicious_addrs:
+                msg = f"相同收件人超過{len(suspicious_addrs[f'ADDR:{norm_addr}'])}件 (地址重複)"
+                if msg not in added_warnings:
+                    order.warnings.append(msg)
+                    added_warnings.add(msg)
+                    order.processing_status = "MANUAL_REQUIRED"
+                    
+            if norm_vat and f"VAT:{norm_vat}" in suspicious_vats:
+                msg = f"相同收件人超過{len(suspicious_vats[f'VAT:{norm_vat}'])}件 (統編/身分證重複)"
+                if msg not in added_warnings:
+                    order.warnings.append(msg)
+                    added_warnings.add(msg)
+                    order.processing_status = "MANUAL_REQUIRED"
 
+        # 將 Warnings 轉換為 JSON 字串
         for order in orders:
             if not order.warnings and order.processing_status == "PENDING":
                 order.processing_status = "PROCESSED"

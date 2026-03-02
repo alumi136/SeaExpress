@@ -49,7 +49,6 @@
         /* 表格樣式 */
         .shadcn-table th { font-weight: 500; color: hsl(215.4 16.3% 46.9%); text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid hsl(214.3 31.8% 91.4%); }
         .shadcn-table td { padding: 0.75rem 1rem; border-bottom: 1px solid hsl(214.3 31.8% 91.4%); font-size: 0.875rem; vertical-align: middle; }
-        .row-hover:hover { background-color: hsl(210 40% 96.1% / 0.5); cursor: pointer; }
         
         /* 其他特效 */
         #global-loader { background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); z-index: 100; }
@@ -117,7 +116,7 @@
                     
                     <!-- 主單統計摘要 -->
                     <div id="mawb-summary" class="hidden flex space-x-3 ml-4 text-xs font-semibold">
-                        <span class="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md border border-blue-100 shadow-sm">分提單數量: <span id="summary-hawb-count">0</span></span>
+                        <span class="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md border border-blue-100 shadow-sm">總件數: <span id="summary-hawb-count">0</span></span>
                         <span class="bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md border border-emerald-100 shadow-sm">總重量: <span id="summary-gw">0.0</span> kg</span>
                         <span class="bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-md border border-amber-100 shadow-sm">總金額: <span id="summary-amount">0</span> TWD</span>
                     </div>
@@ -426,15 +425,36 @@
             if (res.ok) {
                 hawbGroups = await res.json();
                 
-                // 計算並更新統計摘要
-                const hawbCount = hawbGroups.length;
+                // 計算並更新統計摘要 (總件數邏輯更新：若空白或0則當作1箱)
+                const totalCartons = hawbGroups.reduce((sum, g) => {
+                    let c = parseFloat(g.cartons);
+                    if (isNaN(c) || c <= 0) c = 1;
+                    return sum + c;
+                }, 0);
                 const totalGw = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.gross_weight) || 0), 0);
                 const totalAmount = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.total_amount) || 0), 0);
                 
-                document.getElementById('summary-hawb-count').textContent = hawbCount;
+                document.getElementById('summary-hawb-count').textContent = totalCartons;
                 document.getElementById('summary-gw').textContent = totalGw.toFixed(2);
                 document.getElementById('summary-amount').textContent = totalAmount.toLocaleString();
                 summaryDiv.classList.remove('hidden'); // 顯示摘要
+
+                // --- 🌟 設定優先級並排序 🌟 ---
+                hawbGroups.forEach(g => {
+                    // 檢查是否有任一項次缺失稅則號 (ccc_code)
+                    const hasMissingCCC = g.items.some(item => !item.ccc_code || item.ccc_code.trim() === '');
+                    
+                    if (g.processing_status === 'PROCESSED') {
+                        g._severity = 3; // 正常已處理 (綠燈，放最下面)
+                    } else if (hasMissingCCC) {
+                        g._severity = 1; // 最高優先級：缺稅則號 (紅燈，放最上面)
+                    } else {
+                        g._severity = 2; // 次高優先級：其他人工介入 (黃/橘燈，放中間)
+                    }
+                });
+
+                // 依照優先級排序：1 (缺稅則) -> 2 (一般警告) -> 3 (正常)
+                hawbGroups.sort((a, b) => a._severity - b._severity);
 
                 renderAccordionTable();
             }
@@ -451,37 +471,59 @@
             }
 
             hawbGroups.forEach((group, index) => {
-                // 狀態標籤
-                let statusHtml = group.processing_status === 'PROCESSED' 
-                    ? `<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">已處理</span>`
-                    : `<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-200">需人工介入</span>`;
+                // 取得排序時計算的優先級別
+                const isCritical = group._severity === 1;
+                const isWarning = group._severity === 2;
+                const isNormal = group._severity === 3;
 
-                // 收件人資訊組合
-                let cneInfo = (group.consignee_name || '無姓名') + 
-                              (group.consignee_phone ? ` <span class="text-muted-foreground">(${group.consignee_phone})</span>` : '');
+                // 狀態標籤
+                let statusHtml = '';
+                if (isCritical) {
+                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-white text-red-700 shadow-sm border border-red-200">缺稅則號</span>`;
+                } else if (isWarning) {
+                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-orange-200 text-orange-900 border border-orange-300">需人工介入</span>`;
+                } else {
+                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">已處理</span>`;
+                }
+
+                // 收件人資訊組合 (紅底時文字改為淺色避免看不清)
+                let cnePhoneHtml = group.consignee_phone ? ` <span class="${isCritical ? 'text-red-200' : 'text-muted-foreground'}">(${group.consignee_phone})</span>` : '';
+                let cneInfo = (group.consignee_name || '無姓名') + cnePhoneHtml;
 
                 // 警告標籤
                 let warnHtml = group.warnings.length > 0 
-                    ? `<span class="text-xs text-red-600 font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline"></i> 包含 ${group.warnings.length} 項警報</span>` 
+                    ? `<span class="text-xs ${isCritical ? 'text-white' : 'text-red-600'} font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline"></i> 包含 ${group.warnings.length} 項警報</span>` 
                     : '-';
+
+                let hawbNoHtml = `<span class="font-bold ${isCritical ? 'text-white' : 'text-primary'}">${group.hawb_no}</span>`;
+
+                let actionHtml = isNormal 
+                    ? `<button class="${isCritical ? 'text-white' : 'text-primary'} hover:underline text-sm font-medium">檢視</button>`
+                    : `<button onclick="event.stopPropagation(); openEditModal('${group.hawb_no}')" class="shadcn-button shadcn-button-outline h-7 px-3 text-xs ${isCritical ? 'border-white text-red-700 bg-white hover:bg-gray-100' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'} shadow-sm">人工修改</button>`;
+
+                // 🌟 決定整行背景顏色 🌟
+                let trClass = 'border-b border-border cursor-pointer transition-colors ';
+                if (isCritical) {
+                    trClass += 'bg-red-600 text-white hover:bg-red-700'; // 嚴重缺失：整行大紅色配白字
+                } else if (isWarning) {
+                    trClass += 'bg-orange-50 text-gray-800 hover:bg-orange-100'; // 一般警告：橘黃色
+                } else {
+                    trClass += 'bg-white text-gray-800 hover:bg-slate-50'; // 正常：白色
+                }
 
                 // 建立主單行 (HAWB Row)
                 const trMaster = document.createElement('tr');
-                trMaster.className = 'row-hover border-b border-border ' + (group.processing_status !== 'PROCESSED' ? 'bg-red-50/20' : '');
+                trMaster.className = trClass;
                 trMaster.onclick = () => toggleAccordion(index);
                 trMaster.innerHTML = `
-                    <td class="text-muted-foreground text-center" id="icon-${index}"><i data-lucide="chevron-down" class="w-4 h-4 chevron inline-block"></i></td>
+                    <td class="${isCritical ? 'text-white' : 'text-muted-foreground'} text-center" id="icon-${index}"><i data-lucide="chevron-down" class="w-4 h-4 chevron inline-block"></i></td>
                     <td>${statusHtml}</td>
-                    <td class="font-bold text-primary">${group.hawb_no}</td>
+                    <td>${hawbNoHtml}</td>
                     <td class="font-medium">${group.items.length} 項</td>
                     <td class="text-sm truncate max-w-[200px]" title="${group.consignee_address}">${cneInfo}</td>
                     <td class="font-medium">${group.total_amount.toLocaleString()}</td>
                     <td>${warnHtml}</td>
-                    <td class="text-right">
-                        ${group.processing_status !== 'PROCESSED' 
-                            ? `<button onclick="event.stopPropagation(); openEditModal('${group.hawb_no}')" class="shadcn-button shadcn-button-outline h-7 px-3 text-xs border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm">人工修改</button>` 
-                            : `<button class="text-primary hover:underline text-sm font-medium">檢視</button>`}
-                    </td>
+                    <td class="text-right">${actionHtml}</td>
                 `;
                 tbody.appendChild(trMaster);
 
@@ -490,17 +532,21 @@
                 trDetail.id = `detail-${index}`;
                 trDetail.className = 'hidden bg-slate-50/80 border-b border-border';
                 
-                let subTableRows = group.items.map(item => `
-                    <tr class="border-b border-gray-200 last:border-0 hover:bg-white">
-                        <td class="py-2 px-3 text-muted-foreground w-12 text-center">${item.item_no}</td>
-                        <td class="py-2 px-3 max-w-[150px] truncate" title="${item.description_original}">${item.description_original}</td>
-                        <td class="py-2 px-3 text-blue-700">${item.description_official || '-'}</td>
-                        <td class="py-2 px-3 font-mono text-xs">${item.ccc_code || '<span class="text-red-400">無</span>'}</td>
-                        <td class="py-2 px-3">${item.qty}</td>
-                        <td class="py-2 px-3">${item.unit_price}</td>
-                        <td class="py-2 px-3">${item.total_amount}</td>
-                    </tr>
-                `).join('');
+                // 針對缺稅則的特定「品項」再次標示淡紅色底，讓操作員一目了然知道哪一項出錯
+                let subTableRows = group.items.map(item => {
+                    const isItemMissingCCC = !item.ccc_code || item.ccc_code.trim() === '';
+                    return `
+                        <tr class="border-b border-gray-200 last:border-0 hover:bg-white ${isItemMissingCCC ? 'bg-red-50' : ''}">
+                            <td class="py-2 px-3 text-muted-foreground w-12 text-center">${item.item_no}</td>
+                            <td class="py-2 px-3 max-w-[150px] truncate" title="${item.description_original}">${item.description_original}</td>
+                            <td class="py-2 px-3 text-blue-700">${item.description_official || '-'}</td>
+                            <td class="py-2 px-3 font-mono text-xs ${isItemMissingCCC ? 'text-red-600 font-bold' : ''}">${item.ccc_code || '<span class="text-red-500 font-bold">缺稅則號</span>'}</td>
+                            <td class="py-2 px-3">${item.qty}</td>
+                            <td class="py-2 px-3">${item.unit_price}</td>
+                            <td class="py-2 px-3">${item.total_amount}</td>
+                        </tr>
+                    `;
+                }).join('');
 
                 trDetail.innerHTML = `
                     <td colspan="8" class="p-0">
