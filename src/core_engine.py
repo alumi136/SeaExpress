@@ -9,6 +9,8 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database_models import SessionLocal, SeaExpressOrder, BlacklistKeyword
+import unicodedata
+import zhconv  # 🌟 新增：用於繁簡轉換
 
 # --- 設定 Log ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,11 +27,19 @@ class SeaExpressEngine:
         self.session.close()
 
     def _load_knowledge_base(self):
+        """
+        將知識庫載入記憶體。
+        回傳 dict: { '原始品名': {'official': '通關品名', 'ccc': '稅則', 'freq': 出現頻率} }
+        """
         kb = {}
         try:
-            result = self.session.execute(text("SELECT original_description, official_description, ccc_code FROM standard_knowledge_base"))
+            # 🌟 新增：一併抓取 frequency，以便在模糊比對時決定優先順序
+            result = self.session.execute(text("SELECT original_description, official_description, ccc_code, frequency FROM standard_knowledge_base"))
             for row in result:
-                kb[row[0]] = {'official': row[1], 'ccc': row[2]}
+                # 確保存入記憶體時都是大寫，方便比對
+                key = str(row[0]).strip().upper() if row[0] else ""
+                if key:
+                    kb[key] = {'official': row[1], 'ccc': row[2], 'freq': row[3] or 1}
         except Exception as e:
             logging.error(f"載入知識庫失敗: {e}")
         return kb
@@ -54,7 +64,6 @@ class SeaExpressEngine:
         return bl
 
     def _normalize_text(self, text_str):
-        import unicodedata
         if not text_str or pd.isna(text_str): return ""
         val = unicodedata.normalize('NFKC', str(text_str)).upper()
         if '/' in val: val = val.split('/')[-1]
@@ -69,28 +78,83 @@ class SeaExpressEngine:
         return f"{clean_str[:4]}.{clean_str[4:6]}.{clean_str[6:8]}.{clean_str[8:10]}-{clean_str[10]}", True
 
     # ==========================================
-    # 新增：欄位驗證與格式化輔助函式
+    # 🌟 核心升級：繁簡與模糊比對引擎
+    # ==========================================
+    def _search_knowledge_base(self, raw_desc):
+        """
+        多階段搜尋知識庫：
+        1. 精確比對 (原字串)
+        2. 精確比對 (轉簡體)
+        3. 精確比對 (轉繁體)
+        4. 模糊比對 (包含查找，以 freq 與長度決選)
+        """
+        if not raw_desc:
+            return None
+
+        # 步驟 0：基礎清洗 (轉大寫、去符號)
+        clean_desc = self._normalize_text(raw_desc)
+        if not clean_desc:
+            return None
+
+        # 步驟 1：原字串精確比對
+        if clean_desc in self.knowledge_base:
+            return self.knowledge_base[clean_desc]
+
+        # 步驟 2：轉簡體精確比對
+        desc_zh_cn = zhconv.convert(clean_desc, 'zh-cn')
+        if desc_zh_cn != clean_desc and desc_zh_cn in self.knowledge_base:
+            return self.knowledge_base[desc_zh_cn]
+
+        # 步驟 3：轉繁體精確比對
+        desc_zh_tw = zhconv.convert(clean_desc, 'zh-tw')
+        if desc_zh_tw != clean_desc and desc_zh_tw in self.knowledge_base:
+            return self.knowledge_base[desc_zh_tw]
+
+        # 步驟 4：模糊包含比對 (Substring Matching)
+        # 尋找知識庫中，有哪些 key 是「包含」在客戶匯入品名中的 (例如 "保溫杯" 包含於 "黑色不鏽鋼保溫杯")
+        # 為了提高命中率，我們用「簡體版本」的客戶品名來進行包容比對
+        matches = []
+        for kb_key, kb_data in self.knowledge_base.items():
+            # kb_key 是知識庫裡的短詞，desc_zh_cn 是客戶匯入的長詞
+            # 這裡同時比對原字串、簡體、繁體，只要其中一種被包含就算中獎
+            if kb_key in clean_desc or kb_key in desc_zh_cn or kb_key in desc_zh_tw:
+                matches.append({
+                    'key': kb_key,
+                    'data': kb_data
+                })
+
+        if matches:
+            # 若找到多個可能 (例如同時包含 "玩具" 與 "汽車玩具")
+            # 排序邏輯：1. frequency 高的優先 -> 2. 長度長的優先 (越長通常越精確)
+            matches.sort(key=lambda x: (x['data']['freq'], len(x['key'])), reverse=True)
+            
+            # 取第一名 (The Winner)
+            winner = matches[0]
+            logging.info(f"🔍 模糊比對成功: '{clean_desc}' -> 匹配到 '{winner['key']}' (頻率: {winner['data']['freq']})")
+            return winner['data']
+
+        # 若經過 4 個階段都找不到，回傳 None 交由人工處理
+        return None
+
+    # ==========================================
+    # 欄位驗證與格式化輔助函式
     # ==========================================
     def clean_and_validate_phone(self, phone_str):
         """清洗並驗證電話號碼 (過濾符號，檢查 09 或 0 開頭)"""
         if not phone_str or pd.isna(phone_str): 
             return "", True
             
-        # 解決 Pandas 將數字當作浮點數讀取的問題 (例如 930575091.0)
         phone_str = str(phone_str).strip()
         if phone_str.endswith('.0'):
             phone_str = phone_str[:-2]
             
-        # 去除所有空白、短橫線、括號
         clean_phone = re.sub(r'[\s\-\(\)]', '', phone_str)
         if not clean_phone:
             return "", True
             
-        # 如果是 9 開頭的 9 碼數字，自動補 0
         if len(clean_phone) == 9 and clean_phone.startswith('9'):
             clean_phone = '0' + clean_phone
             
-        # 驗證: 0開頭，且總長度至少為9-10碼的純數字
         if re.match(r'^0\d{8,9}$', clean_phone):
             return clean_phone, True
         return clean_phone, False
@@ -100,17 +164,14 @@ class SeaExpressEngine:
         if not vat_str or pd.isna(vat_str): 
             return "", True
             
-        # 解決 Pandas 將數字統編當作浮點數讀取的問題 (例如 80022153.0)
         vat_str = str(vat_str).strip()
         if vat_str.endswith('.0'):
             vat_str = vat_str[:-2]
             
-        # 自動轉大寫並去除前後空白
         clean_vat = vat_str.upper()
         if not clean_vat:
             return "", True
             
-        # 檢查身分證 (1英文字母+9數字) 或 統編 (8數字)
         if re.match(r'^[A-Z]\d{9}$', clean_vat) or re.match(r'^\d{8}$', clean_vat):
             return clean_vat, True
         return clean_vat, False
@@ -199,7 +260,6 @@ class SeaExpressEngine:
             if i is None or pd.isna(row.iloc[i]):
                 return ""
             val = str(row.iloc[i]).strip()
-            # 修正 Pandas 自動將純數字字串轉為浮點數的問題 (例如 930575091.0 -> 930575091)
             if val.endswith('.0') and val[:-2].isdigit():
                 val = val[:-2]
             return val
@@ -263,9 +323,8 @@ class SeaExpressEngine:
             if item['gw'] > hawb_gross_weights[hawb]: 
                 hawb_gross_weights[hawb] = item['gw']
             
-            # AI 知識庫比對
-            clean_desc = self._normalize_text(desc)
-            pred = self.knowledge_base.get(clean_desc)
+            # 🌟 呼叫升級版的多階段 AI 知識庫比對
+            pred = self._search_knowledge_base(desc)
             official_desc = pred['official'] if pred else None
 
             client_ccc = item.get('ccc')
@@ -367,9 +426,7 @@ class SeaExpressEngine:
                 if float(carton_counts[0].cartons) > 6:
                     for i in items: i.warnings.append(f"總箱數超過 6 箱 (目前 {carton_counts[0].cartons}箱)")
 
-            if hawb_total_amt < 400:
-                for i in items: i.warnings.append(f"分提單總金額過低 (<400): {hawb_total_amt}元")
-            elif hawb_total_amt > 48000:
+            if hawb_total_amt > 48000:
                 for i in items: 
                     i.warnings.append(f"分提單總金額超標 (>48000): {hawb_total_amt}元")
                     i.processing_status = "MANUAL_REQUIRED"

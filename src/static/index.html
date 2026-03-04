@@ -58,17 +58,13 @@
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
-    <!-- ========================================== -->
     <!-- 全螢幕 Loading 遮罩 -->
-    <!-- ========================================== -->
     <div id="global-loader" class="hidden-view fixed inset-0 flex items-center justify-center flex-col">
         <i data-lucide="loader-2" class="w-12 h-12 text-primary animate-spin mb-4"></i>
         <h2 class="text-xl font-bold text-gray-800" id="loader-msg">正在處理資料中...</h2>
     </div>
 
-    <!-- ========================================== -->
     <!-- 視圖 1: 登入介面 -->
-    <!-- ========================================== -->
     <div id="login-view" class="flex-1 flex items-center justify-center p-4">
         <div class="w-full max-w-[400px] bg-card rounded-xl border border-border shadow-sm p-6">
             <h3 class="font-semibold tracking-tight text-2xl text-center mb-1">系統登入</h3>
@@ -82,9 +78,7 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
     <!-- 視圖 2: 主控台工作區 -->
-    <!-- ========================================== -->
     <div id="dashboard-view" class="hidden-view flex-1 flex h-screen overflow-hidden">
         
         <!-- 左側選單 -->
@@ -114,11 +108,12 @@
                         <option value="">請選擇主單號...</option>
                     </select>
                     
-                    <!-- 主單統計摘要 -->
+                    <!-- 🌟 升級版：主單統計摘要 (加入預計稅金) 🌟 -->
                     <div id="mawb-summary" class="hidden flex space-x-3 ml-4 text-xs font-semibold">
                         <span class="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md border border-blue-100 shadow-sm">總件數: <span id="summary-hawb-count">0</span></span>
                         <span class="bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md border border-emerald-100 shadow-sm">總重量: <span id="summary-gw">0.0</span> kg</span>
                         <span class="bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-md border border-amber-100 shadow-sm">總金額: <span id="summary-amount">0</span> TWD</span>
+                        <span class="bg-rose-50 text-rose-700 px-2.5 py-1.5 rounded-md border border-rose-100 shadow-sm">預計稅金: <span id="summary-tax">0</span> TWD</span>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -134,7 +129,6 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold tracking-tight text-gray-800">分提單列表 (HAWB)</h2>
                     <div class="flex space-x-2">
-                        <!-- 匯出與匯入按鈕 -->
                         <button onclick="exportExcel()" class="shadcn-button shadcn-button-outline border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                             <i data-lucide="download" class="w-4 h-4 mr-2"></i> 匯出標準報關單
                         </button>
@@ -170,9 +164,7 @@
         </main>
     </div>
 
-    <!-- ========================================== -->
     <!-- 視圖 3: 進階匯入設定視窗 -->
-    <!-- ========================================== -->
     <div id="import-modal" class="hidden-view fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeImportModal()"></div>
         <div class="relative bg-card w-full max-w-md rounded-xl shadow-lg border border-border p-6">
@@ -209,9 +201,7 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
     <!-- 視圖 4: 雙層人工修改視窗 (HAWB-centric) -->
-    <!-- ========================================== -->
     <div id="edit-modal" class="hidden-view fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
         <div class="relative bg-card w-full max-w-6xl rounded-xl shadow-xl border border-border flex flex-col max-h-[90vh]">
@@ -253,11 +243,10 @@
                             <table class="w-full text-left text-sm border-collapse bg-white">
                                 <thead class="bg-muted/50 text-xs">
                                     <tr>
-                                        <!-- 放寬表頭的寬度設定，確保欄位不被擠壓 -->
                                         <th class="p-2 border-b w-10 text-center">項次</th>
                                         <th class="p-2 border-b w-[20%] min-w-[120px]">原始品名 (可改)</th>
                                         <th class="p-2 border-b w-[18%] min-w-[100px]">通關品名</th>
-                                        <th class="p-2 border-b w-[15%] min-w-[110px]">稅則號列 (11碼)</th>
+                                        <th class="p-2 border-b w-[18%] min-w-[130px]">稅則號列 (11碼)</th>
                                         <th class="p-2 border-b w-[9%] min-w-[70px]">數量</th>
                                         <th class="p-2 border-b w-[10%] min-w-[80px] text-amber-600 font-bold">單價</th>
                                         <th class="p-2 border-b w-[10%] min-w-[90px]">總金額</th>
@@ -282,15 +271,39 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
+    <!-- 🌟 視圖 5: 新增 - 常用稅則選擇小視窗 (Modal in Modal) 🌟 -->
+    <div id="hscode-modal" class="hidden-view fixed inset-0 z-[60] flex items-center justify-center">
+        <!-- 半透明背景遮罩 -->
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeHscodeModal()"></div>
+        <div class="relative bg-white w-full max-w-lg rounded-xl shadow-2xl border border-gray-200 flex flex-col max-h-[80vh] overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-blue-50">
+                <h3 class="font-bold text-blue-900 flex items-center"><i data-lucide="search" class="w-4 h-4 mr-2"></i> 快速選擇常用稅則</h3>
+                <button type="button" onclick="closeHscodeModal()" class="text-gray-400 hover:text-gray-700 bg-white rounded-full p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="overflow-y-auto p-0">
+                <table class="w-full text-sm text-left border-collapse">
+                    <thead class="sticky top-0 bg-gray-100 shadow-sm z-10">
+                        <tr>
+                            <th class="p-3 border-b text-gray-600 font-medium">稅則號</th>
+                            <th class="p-3 border-b text-gray-600 font-medium">通關品名</th>
+                            <th class="p-3 border-b w-20 text-center text-gray-600 font-medium">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hscode-list-tbody">
+                        <!-- 由 JS 動態渲染那 15 筆資料 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- 前端核心邏輯 (JavaScript) -->
-    <!-- ========================================== -->
     <script>
         lucide.createIcons();
         const views = { login: document.getElementById('login-view'), dashboard: document.getElementById('dashboard-view') };
-        let hawbGroups = []; // 暫存目前畫面上的 HAWB 群組資料
+        let hawbGroups = []; 
 
-        // --- 1. 登入與權限驗證 ---
+        // --- 登入與權限驗證 ---
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('access_token');
             if (token) verifyToken(token);
@@ -322,7 +335,7 @@
                     views.login.classList.add('hidden-view'); 
                     views.dashboard.classList.remove('hidden-view');
                     document.getElementById('userGreeting').textContent = `${user.username}`;
-                    loadMawbList(); // 登入成功後，載入 MAWB 列表
+                    loadMawbList(); 
                 } else logout();
             } catch { logout(); }
         }
@@ -339,53 +352,6 @@
         }
         function hideLoader() { document.getElementById('global-loader').classList.add('hidden-view'); }
 
-        // --- 匯出 Excel 功能 ---
-        async function exportExcel() {
-            const mawb = document.getElementById('mawbSelector').value;
-            if (!mawb) {
-                alert('請先由左上角選擇要匯出的主單號 (MAWB)！');
-                return;
-            }
-
-            // 檢查是否有未處理的異常
-            const hasErrors = hawbGroups.some(g => g.processing_status !== 'PROCESSED');
-            if (hasErrors) {
-                if (!confirm('⚠️ 注意：目前尚有【需人工介入】的紅燈/黃燈異常未處理！\n\n您確定要強制匯出嗎？')) {
-                    return;
-                }
-            }
-
-            showLoader("正在產出標準報關 Excel...");
-            const token = localStorage.getItem('access_token');
-            
-            try {
-                const res = await fetch(`/api/export/${mawb}`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `海快報關資料_${mawb}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    const err = await res.json();
-                    alert("❌ 匯出失敗: " + (err.detail || '未知錯誤'));
-                }
-            } catch (e) {
-                alert("伺服器連線發生錯誤");
-            } finally {
-                hideLoader();
-            }
-        }
-
-        // --- 2. MAWB 下拉選單處理 ---
         async function loadMawbList(selectMawb = null) {
             const token = localStorage.getItem('access_token');
             const res = await fetch('/api/mawbs', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -404,7 +370,7 @@
                 
                 if (selectMawb && mawbs.includes(selectMawb)) {
                     sel.value = selectMawb;
-                    fetchOrders(); // 自動觸發載入資料
+                    fetchOrders();
                 }
             }
         }
@@ -416,7 +382,7 @@
             
             if (!mawb) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-muted-foreground">請先由左上角選擇主單號 (MAWB)</td></tr>';
-                summaryDiv.classList.add('hidden'); // 隱藏摘要
+                summaryDiv.classList.add('hidden');
                 return;
             }
 
@@ -425,42 +391,31 @@
             if (res.ok) {
                 hawbGroups = await res.json();
                 
-                // 計算並更新統計摘要 (總件數邏輯更新：若空白或0則當作1箱)
-                const totalCartons = hawbGroups.reduce((sum, g) => {
-                    let c = parseFloat(g.cartons);
-                    if (isNaN(c) || c <= 0) c = 1;
-                    return sum + c;
-                }, 0);
+                // 計算並更新統計摘要 (加入預計稅金加總)
+                const totalCartons = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.cartons) || 1), 0);
                 const totalGw = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.gross_weight) || 0), 0);
                 const totalAmount = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.total_amount) || 0), 0);
+                const totalTax = hawbGroups.reduce((sum, g) => sum + (parseFloat(g.estimated_tax) || 0), 0);
                 
                 document.getElementById('summary-hawb-count').textContent = totalCartons;
                 document.getElementById('summary-gw').textContent = totalGw.toFixed(2);
                 document.getElementById('summary-amount').textContent = totalAmount.toLocaleString();
-                summaryDiv.classList.remove('hidden'); // 顯示摘要
+                document.getElementById('summary-tax').textContent = Math.round(totalTax).toLocaleString();
+                summaryDiv.classList.remove('hidden');
 
-                // --- 🌟 設定優先級並排序 🌟 ---
+                // 優先級排序邏輯
                 hawbGroups.forEach(g => {
-                    // 檢查是否有任一項次缺失稅則號 (ccc_code)
                     const hasMissingCCC = g.items.some(item => !item.ccc_code || item.ccc_code.trim() === '');
-                    
-                    if (g.processing_status === 'PROCESSED') {
-                        g._severity = 3; // 正常已處理 (綠燈，放最下面)
-                    } else if (hasMissingCCC) {
-                        g._severity = 1; // 最高優先級：缺稅則號 (紅燈，放最上面)
-                    } else {
-                        g._severity = 2; // 次高優先級：其他人工介入 (黃/橘燈，放中間)
-                    }
+                    if (g.processing_status === 'PROCESSED') g._severity = 3; 
+                    else if (hasMissingCCC) g._severity = 1; 
+                    else g._severity = 2; 
                 });
-
-                // 依照優先級排序：1 (缺稅則) -> 2 (一般警告) -> 3 (正常)
                 hawbGroups.sort((a, b) => a._severity - b._severity);
 
                 renderAccordionTable();
             }
         }
 
-        // --- 3. 渲染手風琴表格 ---
         function renderAccordionTable() {
             const tbody = document.getElementById('ordersTableBody');
             tbody.innerHTML = '';
@@ -471,74 +426,50 @@
             }
 
             hawbGroups.forEach((group, index) => {
-                // 取得排序時計算的優先級別
                 const isCritical = group._severity === 1;
                 const isWarning = group._severity === 2;
                 const isNormal = group._severity === 3;
 
-                // 狀態標籤
                 let statusHtml = '';
-                if (isCritical) {
-                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-white text-red-700 shadow-sm border border-red-200">缺稅則號</span>`;
-                } else if (isWarning) {
-                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-orange-200 text-orange-900 border border-orange-300">需人工介入</span>`;
-                } else {
-                    statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">已處理</span>`;
-                }
+                if (isCritical) statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-bold bg-white text-red-700 shadow-sm border border-red-200">缺稅則號</span>`;
+                else if (isWarning) statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-orange-200 text-orange-900 border border-orange-300">需人工介入</span>`;
+                else statusHtml = `<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">已處理</span>`;
 
-                // 收件人資訊組合 (紅底時文字改為淺色避免看不清)
-                let cnePhoneHtml = group.consignee_phone ? ` <span class="${isCritical ? 'text-red-200' : 'text-muted-foreground'}">(${group.consignee_phone})</span>` : '';
-                let cneInfo = (group.consignee_name || '無姓名') + cnePhoneHtml;
-
-                // 警告標籤
-                let warnHtml = group.warnings.length > 0 
-                    ? `<span class="text-xs ${isCritical ? 'text-white' : 'text-red-600'} font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline"></i> 包含 ${group.warnings.length} 項警報</span>` 
-                    : '-';
-
-                let hawbNoHtml = `<span class="font-bold ${isCritical ? 'text-white' : 'text-primary'}">${group.hawb_no}</span>`;
-
-                let actionHtml = isNormal 
-                    ? `<button class="${isCritical ? 'text-white' : 'text-primary'} hover:underline text-sm font-medium">檢視</button>`
+                let cneInfo = (group.consignee_name || '無姓名') + (group.consignee_phone ? ` <span class="${isCritical ? 'text-red-200' : 'text-muted-foreground'}">(${group.consignee_phone})</span>` : '');
+                let warnHtml = group.warnings.length > 0 ? `<span class="text-xs ${isCritical ? 'text-white' : 'text-red-600'} font-medium"><i data-lucide="alert-circle" class="w-3 h-3 inline"></i> 包含 ${group.warnings.length} 項警報</span>` : '-';
+                let actionHtml = isNormal ? `<button class="${isCritical ? 'text-white' : 'text-primary'} hover:underline text-sm font-medium">檢視</button>`
                     : `<button onclick="event.stopPropagation(); openEditModal('${group.hawb_no}')" class="shadcn-button shadcn-button-outline h-7 px-3 text-xs ${isCritical ? 'border-white text-red-700 bg-white hover:bg-gray-100' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'} shadow-sm">人工修改</button>`;
 
-                // 🌟 決定整行背景顏色 🌟
                 let trClass = 'border-b border-border cursor-pointer transition-colors ';
-                if (isCritical) {
-                    trClass += 'bg-red-600 text-white hover:bg-red-700'; // 嚴重缺失：整行大紅色配白字
-                } else if (isWarning) {
-                    trClass += 'bg-orange-50 text-gray-800 hover:bg-orange-100'; // 一般警告：橘黃色
-                } else {
-                    trClass += 'bg-white text-gray-800 hover:bg-slate-50'; // 正常：白色
-                }
+                if (isCritical) trClass += 'bg-red-600 text-white hover:bg-red-700';
+                else if (isWarning) trClass += 'bg-orange-50 text-gray-800 hover:bg-orange-100';
+                else trClass += 'bg-white text-gray-800 hover:bg-slate-50';
 
-                // 建立主單行 (HAWB Row)
                 const trMaster = document.createElement('tr');
                 trMaster.className = trClass;
                 trMaster.onclick = () => toggleAccordion(index);
                 trMaster.innerHTML = `
                     <td class="${isCritical ? 'text-white' : 'text-muted-foreground'} text-center" id="icon-${index}"><i data-lucide="chevron-down" class="w-4 h-4 chevron inline-block"></i></td>
                     <td>${statusHtml}</td>
-                    <td>${hawbNoHtml}</td>
+                    <td><span class="font-bold ${isCritical ? 'text-white' : 'text-primary'}">${group.hawb_no}</span></td>
                     <td class="font-medium">${group.items.length} 項</td>
-                    <td class="text-sm truncate max-w-[200px]" title="${group.consignee_address}">${cneInfo}</td>
+                    <td class="text-sm truncate max-w-[200px]">${cneInfo}</td>
                     <td class="font-medium">${group.total_amount.toLocaleString()}</td>
                     <td>${warnHtml}</td>
                     <td class="text-right">${actionHtml}</td>
                 `;
                 tbody.appendChild(trMaster);
 
-                // 建立明細子表格 (Items Detail Row) - 預設隱藏
                 const trDetail = document.createElement('tr');
                 trDetail.id = `detail-${index}`;
                 trDetail.className = 'hidden bg-slate-50/80 border-b border-border';
                 
-                // 針對缺稅則的特定「品項」再次標示淡紅色底，讓操作員一目了然知道哪一項出錯
                 let subTableRows = group.items.map(item => {
                     const isItemMissingCCC = !item.ccc_code || item.ccc_code.trim() === '';
                     return `
                         <tr class="border-b border-gray-200 last:border-0 hover:bg-white ${isItemMissingCCC ? 'bg-red-50' : ''}">
                             <td class="py-2 px-3 text-muted-foreground w-12 text-center">${item.item_no}</td>
-                            <td class="py-2 px-3 max-w-[150px] truncate" title="${item.description_original}">${item.description_original}</td>
+                            <td class="py-2 px-3 max-w-[150px] truncate">${item.description_original}</td>
                             <td class="py-2 px-3 text-blue-700">${item.description_official || '-'}</td>
                             <td class="py-2 px-3 font-mono text-xs ${isItemMissingCCC ? 'text-red-600 font-bold' : ''}">${item.ccc_code || '<span class="text-red-500 font-bold">缺稅則號</span>'}</td>
                             <td class="py-2 px-3">${item.qty}</td>
@@ -577,56 +508,68 @@
             }
         }
 
-        // --- 4. 進階匯入對話框處理 ---
-        function openImportModal() {
-            document.getElementById('import-modal').classList.remove('hidden-view');
-            document.getElementById('importFile').value = '';
-            toggleImportMode();
-        }
-        function closeImportModal() { document.getElementById('import-modal').classList.add('hidden-view'); }
-        
-        function toggleImportMode() {
-            const mode = document.getElementById('importMode').value;
-            if (mode === 'NEW') {
-                document.getElementById('divNewMawb').classList.remove('hidden');
-                document.getElementById('divExistMawb').classList.add('hidden');
-            } else {
-                document.getElementById('divNewMawb').classList.add('hidden');
-                document.getElementById('divExistMawb').classList.remove('hidden');
-            }
-        }
+        // --- 🌟 15 筆常用稅則小視窗邏輯 🌟 ---
+        const hardcodedHscodes = [
+            { code: "69119000007", name: "瓷製器皿" },
+            { code: "96170000007", name: "保溫器皿" },
+            { code: "39229090001", name: "其他塑膠材料製品" },
+            { code: "61034911004", name: "褲子" },
+            { code: "90031100006", name: "塑膠製框及架" },
+            { code: "42029290918", name: "其他容器外層為塑膠" },
+            { code: "84803000007", name: "模型" },
+            { code: "95030099006", name: "玩具之零件及附件" },
+            { code: "39269039001", name: "玩具" },
+            { code: "90106000007", name: "放映用螢幕" },
+            { code: "33059090008", name: "其他美髮用具" },
+            { code: "87120090004", name: "其他腳踏車" },
+            { code: "96151100006", name: "髮夾" },
+            { code: "39199090006", name: "塑膠製品" },
+            { code: "71162090004", name: "耳環" }
+        ];
 
-        document.getElementById('importForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const file = document.getElementById('importFile').files[0];
-            const mode = document.getElementById('importMode').value;
-            let mawb = mode === 'NEW' ? document.getElementById('newMawbInput').value : document.getElementById('existMawbSelect').value;
+        let targetEditRow = null; // 記錄目前是哪一列觸發了搜尋
+
+        function openHscodeModal(btnElement) {
+            targetEditRow = btnElement.closest('tr'); // 記住是哪個項次按的放大鏡
+            const tbody = document.getElementById('hscode-list-tbody');
             
-            if (!mawb && mode === 'NEW') mawb = file.name.split('.')[0].toUpperCase();
-            if (!mawb) { alert('無法取得主單號'); return; }
+            // 渲染 15 筆資料
+            tbody.innerHTML = hardcodedHscodes.map(item => `
+                <tr class="hover:bg-blue-50 border-b border-gray-100 transition-colors">
+                    <td class="p-3 font-mono text-sm text-gray-700">${item.code}</td>
+                    <td class="p-3 text-sm text-gray-800 font-medium">${item.name}</td>
+                    <td class="p-3 text-center">
+                        <button type="button" onclick="selectHscode('${item.code}', '${item.name}')" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors">帶入</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('hscode-modal').classList.remove('hidden-view');
+        }
 
-            closeImportModal();
-            showLoader("上傳與 AI 審核中...");
+        function closeHscodeModal() {
+            document.getElementById('hscode-modal').classList.add('hidden-view');
+            targetEditRow = null;
+        }
 
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('mawb_no', mawb);
-            formData.append('import_mode', mode);
+        function selectHscode(code, name) {
+            if (targetEditRow) {
+                // 自動填入對應欄位
+                targetEditRow.querySelector('.i-ccc').value = code;
+                targetEditRow.querySelector('.i-desc-offi').value = name;
+                
+                // 給一點視覺回饋 (閃爍綠色)
+                targetEditRow.querySelector('.i-ccc').classList.add('bg-green-100');
+                targetEditRow.querySelector('.i-desc-offi').classList.add('bg-green-100');
+                setTimeout(() => {
+                    targetEditRow.querySelector('.i-ccc').classList.remove('bg-green-100');
+                    targetEditRow.querySelector('.i-desc-offi').classList.remove('bg-green-100');
+                }, 800);
+            }
+            closeHscodeModal();
+        }
 
-            try {
-                const token = localStorage.getItem('access_token');
-                const res = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-                if (res.ok) {
-                    await loadMawbList(mawb); // 上傳成功，重新載入 MAWB 列表並切換
-                } else {
-                    const err = await res.json();
-                    alert("❌ 匯入失敗: \n" + (err.detail || '未知錯誤'));
-                }
-            } catch(e) { alert("連線錯誤"); }
-            finally { hideLoader(); }
-        });
-
-        // --- 5. 人工修改與放行視窗 ---
+        // --- 人工修改視窗邏輯 ---
         function openEditModal(hawbNo) {
             const group = hawbGroups.find(g => g.hawb_no === hawbNo);
             if (!group) return;
@@ -635,14 +578,12 @@
             document.getElementById('edit_hawb').value = group.hawb_no;
             document.getElementById('edit-subtitle').textContent = `主單: ${group.mawb_no} | 分單: ${group.hawb_no}`;
             
-            // 填寫上半部 (HAWB 共用資訊)
             document.getElementById('edit_cne_name').value = group.consignee_name || '';
             document.getElementById('edit_cne_phone').value = group.consignee_phone || '';
             document.getElementById('edit_cne_addr').value = group.consignee_address || '';
             document.getElementById('edit_gw').value = group.gross_weight || '';
             document.getElementById('edit_cartons').value = group.cartons || '';
 
-            // 處理警告訊息顯示
             const warnDiv = document.getElementById('edit-warnings');
             if (group.warnings.length > 0) {
                 warnDiv.innerHTML = '<strong class="block mb-1">系統阻擋原因：</strong><ul class="list-disc ml-5">' + 
@@ -650,7 +591,6 @@
                 warnDiv.classList.remove('hidden');
             } else { warnDiv.classList.add('hidden'); }
 
-            // 渲染下半部 (Items 表格輸入框) - 已優化寬度與對齊
             const tbody = document.getElementById('editItemsTbody');
             tbody.innerHTML = '';
             group.items.forEach(item => {
@@ -661,7 +601,15 @@
                     </td>
                     <td class="p-1 border-b"><input type="text" class="i-desc-orig shadcn-input shadcn-input-sm w-full border-blue-200 text-xs" value="${item.description_original || ''}"></td>
                     <td class="p-1 border-b"><input type="text" class="i-desc-offi shadcn-input shadcn-input-sm w-full text-xs" value="${item.description_official || ''}"></td>
-                    <td class="p-1 border-b"><input type="text" class="i-ccc shadcn-input shadcn-input-sm w-full font-mono text-xs" value="${item.ccc_code || ''}"></td>
+                    
+                    <!-- 🌟 升級：稅則號旁邊加入放大鏡按鈕 🌟 -->
+                    <td class="p-1 border-b">
+                        <div class="flex items-center space-x-1">
+                            <input type="text" class="i-ccc shadcn-input shadcn-input-sm w-full font-mono text-xs transition-colors" value="${item.ccc_code || ''}">
+                            <button type="button" onclick="openHscodeModal(this)" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 rounded px-2 py-1 text-xs shadow-sm transition-colors" title="開啟常用稅則選單">🔍</button>
+                        </div>
+                    </td>
+                    
                     <td class="p-1 border-b"><input type="number" step="0.01" class="i-qty shadcn-input shadcn-input-sm w-full text-right" value="${item.qty || 0}" oninput="calcRowTotal(this)"></td>
                     <td class="p-1 border-b"><input type="number" step="0.01" class="i-price shadcn-input shadcn-input-sm w-full border-amber-300 bg-amber-50 text-right" value="${item.unit_price || 0}" oninput="calcRowTotal(this)"></td>
                     <td class="p-1 border-b"><input type="number" step="0.01" class="i-total shadcn-input shadcn-input-sm w-full bg-gray-100 font-medium text-right" value="${item.total_amount || 0}" readonly></td>
@@ -675,7 +623,6 @@
 
         function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden-view'); }
 
-        // 即時計算小計
         function calcRowTotal(element) {
             const tr = element.closest('tr');
             const qty = parseFloat(tr.querySelector('.i-qty').value) || 0;
@@ -683,14 +630,11 @@
             tr.querySelector('.i-total').value = Math.floor(qty * price);
         }
 
-        // 送出修改資料
         async function submitEdit() {
             const btn = document.getElementById('btnSaveEdit');
             btn.innerHTML = '儲存中...'; btn.disabled = true;
-            
             const hawbNo = document.getElementById('edit_hawb').value;
             
-            // 收集所有 Items 的資料
             const itemsData = [];
             document.querySelectorAll('#editItemsTbody tr').forEach(tr => {
                 itemsData.push({
@@ -705,7 +649,6 @@
                 });
             });
 
-            // 組合 Payload
             const payload = {
                 mawb_no: document.getElementById('edit_mawb').value,
                 consignee_name: document.getElementById('edit_cne_name').value || null,
@@ -726,7 +669,7 @@
 
                 if (res.ok) {
                     closeEditModal();
-                    fetchOrders(); // 修改成功後重新抓取當前 MAWB 資料更新畫面
+                    fetchOrders(); 
                 } else {
                     const err = await res.json();
                     alert("❌ 儲存失敗: " + (err.detail || '未知錯誤'));
@@ -737,6 +680,57 @@
                 btn.disabled = false; 
                 lucide.createIcons(); 
             }
+        }
+        
+        // --- 匯入相關功能 ---
+        function openImportModal() { document.getElementById('import-modal').classList.remove('hidden-view'); document.getElementById('importFile').value = ''; toggleImportMode(); }
+        function closeImportModal() { document.getElementById('import-modal').classList.add('hidden-view'); }
+        function toggleImportMode() {
+            if (document.getElementById('importMode').value === 'NEW') {
+                document.getElementById('divNewMawb').classList.remove('hidden'); document.getElementById('divExistMawb').classList.add('hidden');
+            } else {
+                document.getElementById('divNewMawb').classList.add('hidden'); document.getElementById('divExistMawb').classList.remove('hidden');
+            }
+        }
+        document.getElementById('importForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = document.getElementById('importFile').files[0];
+            const mode = document.getElementById('importMode').value;
+            let mawb = mode === 'NEW' ? document.getElementById('newMawbInput').value : document.getElementById('existMawbSelect').value;
+            if (!mawb && mode === 'NEW') mawb = file.name.split('.')[0].toUpperCase();
+            if (!mawb) { alert('無法取得主單號'); return; }
+
+            closeImportModal();
+            showLoader("上傳與 AI 審核中...");
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('mawb_no', mawb);
+            formData.append('import_mode', mode);
+
+            try {
+                const token = localStorage.getItem('access_token');
+                const res = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
+                if (res.ok) await loadMawbList(mawb);
+                else { const err = await res.json(); alert("❌ 匯入失敗: \n" + (err.detail || '未知錯誤')); }
+            } catch(e) { alert("連線錯誤"); }
+            finally { hideLoader(); }
+        });
+
+        async function exportExcel() {
+            const mawb = document.getElementById('mawbSelector').value;
+            if (!mawb) return alert('請先由左上角選擇要匯出的主單號！');
+            if (hawbGroups.some(g => g.processing_status !== 'PROCESSED') && !confirm('尚有異常未處理！確定要強制匯出嗎？')) return;
+            showLoader("正在產出標準報關 Excel...");
+            try {
+                const token = localStorage.getItem('access_token');
+                const res = await fetch(`/api/export/${mawb}`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `海快報關資料_${mawb}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+                } else { const err = await res.json(); alert("❌ 匯出失敗: " + (err.detail || '未知錯誤')); }
+            } catch (e) { alert("伺服器連線發生錯誤"); } finally { hideLoader(); }
         }
     </script>
 </body>

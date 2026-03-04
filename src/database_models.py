@@ -108,8 +108,38 @@ class StandardKnowledgeBase(Base):
     original_description = Column(String(200), index=True)
     official_description = Column(String(200))
     ccc_code = Column(String(20))
+    
+    # --- 新增的兩個欄位：稅率與輸入規定 (評估後設為 50 即可) ---
+    tax_rate_1 = Column(String(50), comment="第一欄稅率")
+    import_regulation = Column(String(50), comment="輸入規定")
+    
     frequency = Column(Integer, default=1)
     last_trained_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# =========================================
+# 5. 官方海關進口稅則 (Standard HS Code)
+# =========================================
+class StandardHSCode(Base):
+    __tablename__ = "standard_HSCODE"
+    id = Column(Integer, primary_key=True, index=True)
+    ccc_code = Column(String(20), unique=True, index=True, comment="貨品分類號列(稅則號)")
+    chinese_name = Column(Text, comment="中文貨名")
+    english_name = Column(Text, comment="英文貨名")
+    
+    # 稅率相關欄位長度放寬至 255 (容納冗長的 FTA 國家代碼)
+    tax_rate_1 = Column(String(255), comment="第一欄稅率")
+    tax_rate_2 = Column(String(255), comment="第二欄稅率")
+    tax_rate_3 = Column(String(255), comment="第三欄稅率")
+    
+    qty_unit = Column(String(50), comment="統計數量單位")
+    weight_unit = Column(String(50), comment="統計重量單位")
+    
+    # 規定相關欄位長度放寬至 255
+    tax_regulation = Column(String(255), comment="稽徵規定")
+    import_regulation = Column(String(255), comment="輸入規定")
+    export_regulation = Column(String(255), comment="輸出規定")
+    
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # =========================================
@@ -137,7 +167,7 @@ SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbn
 # 建立引擎 (pool_pre_ping=True 可防止 MySQL 連線逾時斷線)
 engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False, pool_pre_ping=True)
 
-# !!! 關鍵定義區 (遺漏這裡就會報錯) !!!
+# !!! 關鍵定義區 !!!
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
