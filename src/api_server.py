@@ -275,6 +275,7 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
     item_updates_dict = {item.id: item for item in update_data.items}
     
     learned_count = 0 # 紀錄 AI 這次學了幾個新單字
+    local_kb_cache = {} # 🌟 新增：本次交易的本地快取，防止同一筆分單內出現重複品名導致寫入衝突
 
     for order in orders:
         order.consignee_name = update_data.consignee_name
@@ -299,28 +300,39 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
                 clean_ccc = format_ccc_for_kb(item_data.ccc_code)
                 
                 if clean_orig_desc:
-                    # 去知識庫找找看這東西有沒有學過
-                    kb_entry = db.query(StandardKnowledgeBase).filter(StandardKnowledgeBase.original_description == clean_orig_desc).first()
-                    
-                    if kb_entry:
-                        # 學過但可能稅號改了，更新記憶並增加出現頻率
+                    # 🌟 改良：先檢查本次 Transaction 的本地快取，避免重複 Insert
+                    if clean_orig_desc in local_kb_cache:
+                        kb_entry = local_kb_cache[clean_orig_desc]
                         if kb_entry.ccc_code != clean_ccc or kb_entry.official_description != item_data.description_official:
                             kb_entry.official_description = item_data.description_official
                             kb_entry.ccc_code = clean_ccc
                             kb_entry.last_trained_at = datetime.utcnow()
-                            learned_count += 1
                         kb_entry.frequency += 1
                     else:
-                        # 完全沒見過的新品名，寫入全新記憶！
-                        new_kb = StandardKnowledgeBase(
-                            original_description=clean_orig_desc,
-                            official_description=item_data.description_official,
-                            ccc_code=clean_ccc,
-                            frequency=1,
-                            last_trained_at=datetime.utcnow()
-                        )
-                        db.add(new_kb)
-                        learned_count += 1
+                        # 去知識庫找找看這東西有沒有學過
+                        kb_entry = db.query(StandardKnowledgeBase).filter(StandardKnowledgeBase.original_description == clean_orig_desc).first()
+                        
+                        if kb_entry:
+                            # 學過但可能稅號改了，更新記憶並增加出現頻率
+                            if kb_entry.ccc_code != clean_ccc or kb_entry.official_description != item_data.description_official:
+                                kb_entry.official_description = item_data.description_official
+                                kb_entry.ccc_code = clean_ccc
+                                kb_entry.last_trained_at = datetime.utcnow()
+                                learned_count += 1
+                            kb_entry.frequency += 1
+                            local_kb_cache[clean_orig_desc] = kb_entry
+                        else:
+                            # 完全沒見過的新品名，寫入全新記憶！
+                            new_kb = StandardKnowledgeBase(
+                                original_description=clean_orig_desc,
+                                official_description=item_data.description_official,
+                                ccc_code=clean_ccc,
+                                frequency=1,
+                                last_trained_at=datetime.utcnow()
+                            )
+                            db.add(new_kb)
+                            local_kb_cache[clean_orig_desc] = new_kb
+                            learned_count += 1
             
         order.processing_status = "PROCESSED"
         order.warnings = "[]"
@@ -341,7 +353,6 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
         msg += f" (AI 已自動學習 {learned_count} 筆新詞彙)"
         
     return {"message": msg}
-
 
 # ==========================================
 # 匯出標準報關單 API

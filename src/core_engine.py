@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database_models import SessionLocal, SeaExpressOrder, BlacklistKeyword
 import unicodedata
-import zhconv  # 🌟 新增：用於繁簡轉換
+import zhconv  # 用於繁簡轉換
 
 # --- 設定 Log ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,10 +33,8 @@ class SeaExpressEngine:
         """
         kb = {}
         try:
-            # 🌟 新增：一併抓取 frequency，以便在模糊比對時決定優先順序
             result = self.session.execute(text("SELECT original_description, official_description, ccc_code, frequency FROM standard_knowledge_base"))
             for row in result:
-                # 確保存入記憶體時都是大寫，方便比對
                 key = str(row[0]).strip().upper() if row[0] else ""
                 if key:
                     kb[key] = {'official': row[1], 'ccc': row[2], 'freq': row[3] or 1}
@@ -83,40 +81,32 @@ class SeaExpressEngine:
     def _search_knowledge_base(self, raw_desc):
         """
         多階段搜尋知識庫：
-        1. 精確比對 (原字串)
-        2. 精確比對 (轉簡體)
-        3. 精確比對 (轉繁體)
-        4. 模糊比對 (包含查找，以 freq 與長度決選)
+        回傳: (預測結果字典, 是否為多筆模糊匹配_Boolean)
         """
         if not raw_desc:
-            return None
+            return None, False
 
-        # 步驟 0：基礎清洗 (轉大寫、去符號)
         clean_desc = self._normalize_text(raw_desc)
         if not clean_desc:
-            return None
+            return None, False
 
         # 步驟 1：原字串精確比對
         if clean_desc in self.knowledge_base:
-            return self.knowledge_base[clean_desc]
+            return self.knowledge_base[clean_desc], False
 
         # 步驟 2：轉簡體精確比對
         desc_zh_cn = zhconv.convert(clean_desc, 'zh-cn')
         if desc_zh_cn != clean_desc and desc_zh_cn in self.knowledge_base:
-            return self.knowledge_base[desc_zh_cn]
+            return self.knowledge_base[desc_zh_cn], False
 
         # 步驟 3：轉繁體精確比對
         desc_zh_tw = zhconv.convert(clean_desc, 'zh-tw')
         if desc_zh_tw != clean_desc and desc_zh_tw in self.knowledge_base:
-            return self.knowledge_base[desc_zh_tw]
+            return self.knowledge_base[desc_zh_tw], False
 
-        # 步驟 4：模糊包含比對 (Substring Matching)
-        # 尋找知識庫中，有哪些 key 是「包含」在客戶匯入品名中的 (例如 "保溫杯" 包含於 "黑色不鏽鋼保溫杯")
-        # 為了提高命中率，我們用「簡體版本」的客戶品名來進行包容比對
+        # 步驟 4：模糊包含比對
         matches = []
         for kb_key, kb_data in self.knowledge_base.items():
-            # kb_key 是知識庫裡的短詞，desc_zh_cn 是客戶匯入的長詞
-            # 這裡同時比對原字串、簡體、繁體，只要其中一種被包含就算中獎
             if kb_key in clean_desc or kb_key in desc_zh_cn or kb_key in desc_zh_tw:
                 matches.append({
                     'key': kb_key,
@@ -124,23 +114,29 @@ class SeaExpressEngine:
                 })
 
         if matches:
-            # 若找到多個可能 (例如同時包含 "玩具" 與 "汽車玩具")
-            # 排序邏輯：1. frequency 高的優先 -> 2. 長度長的優先 (越長通常越精確)
             matches.sort(key=lambda x: (x['data']['freq'], len(x['key'])), reverse=True)
-            
-            # 取第一名 (The Winner)
             winner = matches[0]
-            logging.info(f"🔍 模糊比對成功: '{clean_desc}' -> 匹配到 '{winner['key']}' (頻率: {winner['data']['freq']})")
-            return winner['data']
+            
+            # 判斷是否有多筆模糊匹配
+            is_fuzzy_multiple = len(matches) > 1
+            logging.info(f"🔍 模糊比對成功: '{clean_desc}' -> 匹配到 '{winner['key']}' (多重匹配: {is_fuzzy_multiple})")
+            
+            return winner['data'], is_fuzzy_multiple
 
-        # 若經過 4 個階段都找不到，回傳 None 交由人工處理
-        return None
+        return None, False
 
     # ==========================================
     # 欄位驗證與格式化輔助函式
     # ==========================================
     def clean_and_validate_phone(self, phone_str):
-        """清洗並驗證電話號碼 (過濾符號，檢查 09 或 0 開頭)"""
+        """
+        更新邏輯 (依照需求指示):
+        1. 自動將所有英文字母刪除
+        2. 若第一個數字不是0，先補上0
+        3. 09開頭，必須剛好10碼，否則告警
+        4. 01開頭，直接告警
+        5. 02~08開頭，不做長度邏輯判斷 (若有 # 等特殊符號則拋給人工介入)
+        """
         if not phone_str or pd.isna(phone_str): 
             return "", True
             
@@ -148,15 +144,39 @@ class SeaExpressEngine:
         if phone_str.endswith('.0'):
             phone_str = phone_str[:-2]
             
+        # Q1: 自動把所有英文字母刪除
+        phone_str = re.sub(r'[A-Za-z]', '', phone_str)
+            
         clean_phone = re.sub(r'[\s\-\(\)]', '', phone_str)
         if not clean_phone:
             return "", True
             
-        if len(clean_phone) == 9 and clean_phone.startswith('9'):
+        # 需求: 若第一個數字不是 0，先補上 0
+        if not clean_phone.startswith('0'):
             clean_phone = '0' + clean_phone
             
-        if re.match(r'^0\d{8,9}$', clean_phone):
-            return clean_phone, True
+        prefix = clean_phone[:2]
+        
+        # 需求: 09 開頭，限制剛好 10 碼 (且防呆確保皆為數字)
+        if prefix == '09':
+            if len(clean_phone) == 10 and clean_phone.isdigit():
+                return clean_phone, True
+            else:
+                return clean_phone, False
+                
+        # 需求: 01 開頭，直接告警並人工介入
+        if prefix == '01':
+            return clean_phone, False
+            
+        # 需求: 02 到 08 開頭，不做長度邏輯判斷
+        # Q3: 含有 # 等分機符號不予自動處理，直接拋給人工審核 (isdigit() 判斷)
+        if prefix in ['02', '03', '04', '05', '06', '07', '08']:
+            if clean_phone.isdigit():
+                return clean_phone, True
+            else:
+                return clean_phone, False
+            
+        # 其他未定義的極端狀況，預設告警
         return clean_phone, False
 
     def validate_vat_id(self, vat_str):
@@ -323,9 +343,14 @@ class SeaExpressEngine:
             if item['gw'] > hawb_gross_weights[hawb]: 
                 hawb_gross_weights[hawb] = item['gw']
             
-            # 🌟 呼叫升級版的多階段 AI 知識庫比對
-            pred = self._search_knowledge_base(desc)
-            official_desc = pred['official'] if pred else None
+            # 🌟 呼叫升級版的多階段 AI 知識庫比對，並取得是否為多筆模糊匹配
+            search_result, is_fuzzy_multiple = self._search_knowledge_base(desc)
+            official_desc = search_result['official'] if search_result else None
+
+            # 需求：若有多筆模糊匹配，立刻觸發警告與人工介入，且精簡顯示為 "稅則模糊"
+            if is_fuzzy_multiple:
+                status = "MANUAL_REQUIRED"
+                warnings.append("稅則模糊")
 
             client_ccc = item.get('ccc')
             final_ccc = None
@@ -342,8 +367,8 @@ class SeaExpressEngine:
                         status = "MANUAL_REQUIRED"
                         warnings.append(f"客戶指定之稅則號不在系統知識庫中: {final_ccc}")
             else:
-                final_ccc = pred['ccc'] if pred else None
-                if not pred:
+                final_ccc = search_result['ccc'] if search_result else None
+                if not search_result:
                     status = "MANUAL_REQUIRED"
                     warnings.append("AI 查無此品名稅號 (且客戶未提供)")
 
@@ -366,7 +391,7 @@ class SeaExpressEngine:
             clean_phone, is_phone_valid = self.clean_and_validate_phone(item.get('cne_phone'))
             if item.get('cne_phone') and not is_phone_valid:
                 status = "MANUAL_REQUIRED"
-                warnings.append(f"收件電話格式異常: {item.get('cne_phone')}")
+                warnings.append(f"收件電話格式異常: {item.get('cne_phone')} (系統轉化為: {clean_phone})")
             item['cne_phone'] = clean_phone
 
             # --- 統編/身分證格式驗證 ---
