@@ -163,7 +163,6 @@ class SeaExpressEngine:
         """智慧解析 Excel (加入 CSV 支援與新格式彈性 mapping)"""
         is_csv = filepath.lower().endswith('.csv')
         
-        # 1. 預覽尋找表頭 (防呆 CSV 編碼)
         try:
             if is_csv:
                 try: df_preview = pd.read_csv(filepath, header=None, nrows=10, encoding='utf-8')
@@ -181,7 +180,6 @@ class SeaExpressEngine:
                 header_idx = i
                 break
                 
-        # 2. 正式讀取
         try:
             if is_csv:
                 try: df = pd.read_csv(filepath, header=header_idx, encoding='utf-8')
@@ -194,7 +192,6 @@ class SeaExpressEngine:
 
         columns = df.columns.tolist()
         
-        # 3. 彈性欄位對應 (加入新格式關鍵字，支援簡體與特定標題)
         idx = {
             'hawb': self._find_col(columns, ['分提單', '分提單號碼']),
             'item': self._find_col(columns, ['貨物編號', '項次']),
@@ -204,10 +201,7 @@ class SeaExpressEngine:
             'spec': self._find_col(columns, ['規格']),
             'qty': self._find_col(columns, ['數量'], exclude_words=['單位', '代碼']),
             'qty_unit': self._find_col(columns, ['數量單位']),
-            
-            # 🌟 修正點：將 '單價金額' 加入首選，並將 '條件' 加入排除名單，防止誤抓「單價條件」
             'price': self._find_col(columns, ['單價金額', '單價'], exclude_words=['代碼', '幣', '條件']),
-            
             'currency': self._find_col(columns, ['單價幣代碼', '幣別', '單價幣別代碼']),
             'total': self._find_col(columns, ['總金額', '發票總金額'], exclude_words=['幣', '代碼']),
             'nw': self._find_col(columns, ['淨重']),
@@ -260,13 +254,11 @@ class SeaExpressEngine:
             is_missing_parent = False
             hawb_val = get_str(row, idx['hawb'])
             
-            # 若當前列有分單號，更新母單資訊
             if hawb_val: 
                 current_hawb = hawb_val
                 current_gw = get_float(row, idx['gw'])
                 current_cartons = get_float(row, idx['cartons'])
             else:
-                # 否則標記為需要繼承上一筆資訊並觸發警告
                 is_missing_parent = True
                 
             if not current_hawb: continue
@@ -281,17 +273,16 @@ class SeaExpressEngine:
                 'hawb_no': current_hawb, 
                 'item_no': parsed_item_no, 
                 'description_original': desc_val,
-                'missing_parent': is_missing_parent # 標記此筆為向下填補，需要在業務邏輯告警
+                'missing_parent': is_missing_parent
             }
             
             for key in idx:
                 if key not in ['hawb', 'item', 'desc', 'gw', 'cartons']:
                     item_data[key] = get_float(row, idx[key]) if key in ['qty', 'price', 'total', 'nw'] else get_str(row, idx[key])
             
-            # 根據是否繼承，決定毛重與件數
             if is_missing_parent:
-                item_data['gw'] = current_gw
-                item_data['cartons'] = current_cartons
+                item_data['gw'] = 0.0
+                item_data['cartons'] = 0
             else:
                 item_data['gw'] = get_float(row, idx['gw'])
                 item_data['cartons'] = get_float(row, idx['cartons'])
@@ -321,17 +312,17 @@ class SeaExpressEngine:
             status = "PENDING"
             
             hawb_item_counter[hawb] += 1
-            # 貨物編號為空時，系統自動依序補上 1, 2, 3...
             final_item_no = item['item_no'] if item['item_no'] > 0 else hawb_item_counter[hawb]
             
             hawb_net_weights[hawb] += item['nw']
             if item['gw'] > hawb_gross_weights[hawb]: 
                 hawb_gross_weights[hawb] = item['gw']
             
-            # 🌟 空白繼承警告邏輯
-            if item.get('missing_parent'):
-                status = "MANUAL_REQUIRED"
-                warnings.append("分提單號/毛重/件數為空白，系統已自動歸屬至上一筆，請人工確認。")
+            # 🌟 修正點：靜默處理多品項的正常留空。真正的防呆只檢查「主項次」是否漏填。
+            if not item.get('missing_parent'):
+                if item.get('gw', 0) <= 0 or item.get('cartons', 0) <= 0:
+                    status = "MANUAL_REQUIRED"
+                    warnings.append(f"主項次的毛重或件數為 0 或空白，請人工補齊。")
 
             search_result, is_fuzzy_multiple = self._search_knowledge_base(desc)
             official_desc = search_result['official'] if search_result else None
@@ -387,7 +378,6 @@ class SeaExpressEngine:
                 warnings.append(f"收貨人統編/身分證格式異常: {item.get('cne_vat')}")
             item['cne_vat'] = clean_vat
 
-            # 🌟 全系統通用自動補齊預設值邏輯
             brand_val = item.get('brand') if item.get('brand') else 'No Brand'
             spec_val = item.get('spec') if item.get('spec') else 'N/M'
             curr_val = item.get('currency') if item.get('currency') else 'TWD'
@@ -424,7 +414,6 @@ class SeaExpressEngine:
             if norm_addr: consignee_tracker[f"ADDR:{norm_addr}"].add(hawb)
             if norm_vat: consignee_tracker[f"VAT:{norm_vat}"].add(hawb)
 
-        # 第二階段與第三階段驗證 (保持不變)
         for hawb, items in hawb_groups.items():
             hawb_total_amt = sum(i.total_amount for i in items)
             
