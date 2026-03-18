@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 執行遠端部署腳本
+    - name: 執行遠端部署腳本                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.GCP_HOST }}
