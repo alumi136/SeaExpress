@@ -318,7 +318,6 @@ class SeaExpressEngine:
             if item['gw'] > hawb_gross_weights[hawb]: 
                 hawb_gross_weights[hawb] = item['gw']
             
-            # 🌟 修正點：靜默處理多品項的正常留空。真正的防呆只檢查「主項次」是否漏填。
             if not item.get('missing_parent'):
                 if item.get('gw', 0) <= 0 or item.get('cartons', 0) <= 0:
                     status = "MANUAL_REQUIRED"
@@ -329,7 +328,8 @@ class SeaExpressEngine:
 
             if is_fuzzy_multiple:
                 status = "MANUAL_REQUIRED"
-                warnings.append("稅則模糊")
+                # 🌟 唯一修改處：明確標示出是哪一個品名模糊
+                warnings.append(f"稅則模糊 (品項: {desc})")
 
             client_ccc = item.get('ccc')
             final_ccc = None
