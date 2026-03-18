@@ -30,4 +30,4 @@ jobs:
           # pip install -r requirements.txt
           
           # 4. 重新啟動 FastAPI 伺服器 (請確保您的 service 名稱正確)
-          sudo systemctl restart seaexpress
+          # sudo systemctl restart seaexpress
