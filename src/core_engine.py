@@ -22,6 +22,7 @@ class SeaExpressEngine:
         self.knowledge_base = self._load_knowledge_base()
         self.blacklist = self._load_blacklist()
         self.valid_cccs = self._load_valid_cccs()
+        self.official_cccs = self._load_official_cccs()
 
     def __del__(self):
         self.session.close()
@@ -42,6 +43,17 @@ class SeaExpressEngine:
         cccs = set()
         try:
             result = self.session.execute(text("SELECT DISTINCT ccc_code FROM standard_knowledge_base"))
+            for row in result:
+                if row[0]: cccs.add(str(row[0]).strip())
+        except Exception as e:
+            pass
+        return cccs
+
+    def _load_official_cccs(self):
+        """載入海關官方所有的合法稅則號 (用於第2次核對)"""
+        cccs = set()
+        try:
+            result = self.session.execute(text("SELECT DISTINCT ccc_code FROM standard_HSCODE"))
             for row in result:
                 if row[0]: cccs.add(str(row[0]).strip())
         except Exception as e:
@@ -343,8 +355,10 @@ class SeaExpressEngine:
                 else:
                     final_ccc = formatted_ccc
                     if len(self.valid_cccs) > 0 and final_ccc not in self.valid_cccs:
-                        status = "MANUAL_REQUIRED"
-                        warnings.append(f"客戶指定之稅則號不在系統知識庫中: {final_ccc}")
+                        # 🌟 新增邏輯：第2次核對，到 standard_HSCODE 中檢查是否為官方合法稅則
+                        if final_ccc not in self.official_cccs:
+                            status = "MANUAL_REQUIRED"
+                            warnings.append(f"客戶指定之稅則號不在系統知識庫與海關官方稅則表中: {final_ccc}")
             else:
                 final_ccc = search_result['ccc'] if search_result else None
                 if not search_result:
