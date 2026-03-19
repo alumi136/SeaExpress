@@ -20,7 +20,7 @@ import pandas as pd
 # 匯入資料庫與驗證模組
 from database_models import SessionLocal, User, SeaExpressOrder, AuditLog, StandardKnowledgeBase
 from auth import verify_password
-#from core_engine import SeaExpressEngine
+from core_engine import SeaExpressEngine
 
 # --- JWT 設定 ---
 SECRET_KEY = "your_super_secret_key_change_this_in_production"
