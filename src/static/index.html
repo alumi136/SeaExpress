@@ -193,6 +193,53 @@
                     <select id="existMawbSelect" class="shadcn-input"></select>
                 </div>
                 
+                <!-- 🌟 新增：進階防呆檢核設定 🌟 -->
+                <div class="space-y-3 mt-4 border-t border-border pt-4">
+                    <h4 class="text-sm font-bold text-gray-700 flex items-center"><i data-lucide="settings-2" class="w-4 h-4 mr-1"></i> 進階防呆檢核設定</h4>
+                    <div class="space-y-2 text-sm bg-slate-50 p-3 rounded-md border border-slate-100">
+                        <!-- 金額 -->
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="chk_amount" class="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary">
+                                <span>分單總金額超標警報 (> TWD)</span>
+                            </label>
+                            <input type="number" id="val_amount" class="shadcn-input shadcn-input-sm w-24 text-right">
+                        </div>
+                        <!-- 箱數 -->
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="chk_carton" class="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary">
+                                <span>總箱數過多警報 (> 箱)</span>
+                            </label>
+                            <input type="number" id="val_carton" class="shadcn-input shadcn-input-sm w-24 text-right">
+                        </div>
+                        <!-- 重複姓名 -->
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="chk_dup_name" class="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary">
+                                <span>化整為零：姓名重複警報 (>= 件)</span>
+                            </label>
+                            <input type="number" id="val_dup_name" class="shadcn-input shadcn-input-sm w-24 text-right">
+                        </div>
+                        <!-- 重複地址 -->
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="chk_dup_addr" class="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary">
+                                <span>化整為零：地址重複警報 (>= 件)</span>
+                            </label>
+                            <input type="number" id="val_dup_addr" class="shadcn-input shadcn-input-sm w-24 text-right">
+                        </div>
+                        <!-- 重複統編 -->
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="chk_dup_vat" class="rounded border-gray-300 w-4 h-4 text-primary focus:ring-primary">
+                                <span>化整為零：統編/身分證重複 (>= 件)</span>
+                            </label>
+                            <input type="number" id="val_dup_vat" class="shadcn-input shadcn-input-sm w-24 text-right">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="pt-2 flex justify-end space-x-2">
                     <button type="button" onclick="closeImportModal()" class="shadcn-button shadcn-button-outline">取消</button>
                     <button type="submit" class="shadcn-button shadcn-button-primary">開始匯入</button>
@@ -683,7 +730,12 @@
         }
         
         // --- 匯入相關功能 ---
-        function openImportModal() { document.getElementById('import-modal').classList.remove('hidden-view'); document.getElementById('importFile').value = ''; toggleImportMode(); }
+        function openImportModal() { 
+            document.getElementById('import-modal').classList.remove('hidden-view'); 
+            document.getElementById('importFile').value = ''; 
+            toggleImportMode(); 
+            loadImportSettings(); // 打開時自動載入設定
+        }
         function closeImportModal() { document.getElementById('import-modal').classList.add('hidden-view'); }
         function toggleImportMode() {
             if (document.getElementById('importMode').value === 'NEW') {
@@ -692,6 +744,47 @@
                 document.getElementById('divNewMawb').classList.add('hidden'); document.getElementById('divExistMawb').classList.remove('hidden');
             }
         }
+
+        // 🌟 新增：讀取與儲存設定的邏輯 🌟
+        function loadImportSettings() {
+            const defaultSettings = {
+                chk_amount: true, val_amount: 48000,
+                chk_carton: true, val_carton: 6,
+                chk_dup_name: true, val_dup_name: 3,
+                chk_dup_addr: true, val_dup_addr: 3,
+                chk_dup_vat: true, val_dup_vat: 3
+            };
+            const settings = JSON.parse(localStorage.getItem('seaExpressImportSettings')) || defaultSettings;
+            
+            document.getElementById('chk_amount').checked = settings.chk_amount;
+            document.getElementById('val_amount').value = settings.val_amount;
+            document.getElementById('chk_carton').checked = settings.chk_carton;
+            document.getElementById('val_carton').value = settings.val_carton;
+            document.getElementById('chk_dup_name').checked = settings.chk_dup_name;
+            document.getElementById('val_dup_name').value = settings.val_dup_name;
+            document.getElementById('chk_dup_addr').checked = settings.chk_dup_addr;
+            document.getElementById('val_dup_addr').value = settings.val_dup_addr;
+            document.getElementById('chk_dup_vat').checked = settings.chk_dup_vat;
+            document.getElementById('val_dup_vat').value = settings.val_dup_vat;
+        }
+
+        function saveImportSettings() {
+            const settings = {
+                chk_amount: document.getElementById('chk_amount').checked,
+                val_amount: document.getElementById('val_amount').value,
+                chk_carton: document.getElementById('chk_carton').checked,
+                val_carton: document.getElementById('val_carton').value,
+                chk_dup_name: document.getElementById('chk_dup_name').checked,
+                val_dup_name: document.getElementById('val_dup_name').value,
+                chk_dup_addr: document.getElementById('chk_dup_addr').checked,
+                val_dup_addr: document.getElementById('val_dup_addr').value,
+                chk_dup_vat: document.getElementById('chk_dup_vat').checked,
+                val_dup_vat: document.getElementById('val_dup_vat').value
+            };
+            localStorage.setItem('seaExpressImportSettings', JSON.stringify(settings));
+            return settings;
+        }
+
         document.getElementById('importForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const file = document.getElementById('importFile').files[0];
@@ -700,6 +793,9 @@
             if (!mawb && mode === 'NEW') mawb = file.name.split('.')[0].toUpperCase();
             if (!mawb) { alert('無法取得主單號'); return; }
 
+            // 🌟 匯入前先儲存設定 🌟
+            const rulesConfig = saveImportSettings();
+
             closeImportModal();
             showLoader("上傳與 AI 審核中...");
 
@@ -707,6 +803,7 @@
             formData.append('file', file);
             formData.append('mawb_no', mawb);
             formData.append('import_mode', mode);
+            formData.append('rules_config', JSON.stringify(rulesConfig)); // 🌟 將設定傳給後端
 
             try {
                 const token = localStorage.getItem('access_token');

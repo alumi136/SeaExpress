@@ -223,6 +223,7 @@ async def upload_excel(
     file: UploadFile = File(...),
     mawb_no: str = Form(...),
     import_mode: str = Form(...),
+    rules_config: str = Form(None), # 🌟 新增：接收前端設定
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -235,8 +236,17 @@ async def upload_excel(
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
         
+    # 🌟 解析 JSON 設定字串
+    config_dict = {}
+    if rules_config:
+        try:
+            config_dict = json.loads(rules_config)
+        except Exception as e:
+            pass
+
     engine = SeaExpressEngine()
-    success, msg = engine.process_and_save(file_location, mawb_no, import_mode=import_mode, operator_id=current_user.id)
+    # 🌟 將設定傳入核心引擎
+    success, msg = engine.process_and_save(file_location, mawb_no, import_mode=import_mode, operator_id=current_user.id, rules_config=config_dict)
     
     if not success: raise HTTPException(status_code=400, detail=msg)
     return {"message": "匯入成功", "detail": msg}
