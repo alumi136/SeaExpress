@@ -113,6 +113,43 @@ class SeaExpressEngine:
 
         return None, False
 
+    def get_candidates(self, raw_desc):
+        """🌟 恢復舊版功能：撈取 AI 歷史推薦選單"""
+        if not raw_desc: return []
+        clean_desc = self._normalize_text(raw_desc)
+        if not clean_desc: return []
+
+        desc_zh_cn = zhconv.convert(clean_desc, 'zh-cn')
+        desc_zh_tw = zhconv.convert(clean_desc, 'zh-tw')
+
+        matches = []
+        for kb_key, kb_data in self.knowledge_base.items():
+            if kb_key in clean_desc or kb_key in desc_zh_cn or kb_key in desc_zh_tw:
+                matches.append({
+                    'official': kb_data['official'], 
+                    'ccc': kb_data['ccc'], 
+                    'freq': kb_data['freq'], 
+                    'key': kb_key
+                })
+
+        if not matches:
+            return []
+
+        # 依照樣本出現次數與長度排序
+        matches.sort(key=lambda x: (x['freq'], len(x['key'])), reverse=True)
+        
+        seen = set()
+        unique_matches = []
+        for m in matches:
+            pair = (m['official'], m['ccc'])
+            if pair not in seen:
+                seen.add(pair)
+                unique_matches.append({"official": m['official'], "ccc": m['ccc']})
+            if len(unique_matches) >= 5: # 最多推薦 5 筆
+                break
+                
+        return unique_matches
+
     def clean_and_validate_phone(self, phone_str):
         if not phone_str or pd.isna(phone_str): return "", True
             
@@ -172,7 +209,6 @@ class SeaExpressEngine:
         return str(row.iloc[idx]).strip() if idx is not None and pd.notna(row.iloc[idx]) else ""
 
     def parse_excel(self, filepath):
-        """智慧解析 Excel (加入 CSV 支援與新格式彈性 mapping)"""
         is_csv = filepath.lower().endswith('.csv')
         
         try:
@@ -312,7 +348,6 @@ class SeaExpressEngine:
         if rules_config is None:
             rules_config = {}
             
-        # 讀取動態設定，合併為單一門檻 (化整為零)
         check_amount = rules_config.get('chk_amount', True)
         limit_amount = float(rules_config.get('val_amount', 48000))
         check_carton = rules_config.get('chk_carton', True)
@@ -375,7 +410,6 @@ class SeaExpressEngine:
                     status = "MANUAL_REQUIRED"
                     warnings.append("AI 查無此品名稅號 (且客戶未提供)")
 
-            # 黑名單防呆：雙向轉繁簡體比對 (包含 Contains 判斷)
             desc_zh_cn = zhconv.convert(desc, 'zh-cn')
             desc_zh_tw = zhconv.convert(desc, 'zh-tw')
             for kw in self.blacklist:
@@ -435,7 +469,6 @@ class SeaExpressEngine:
             orders.append(order)
             hawb_groups[hawb].append(order)
             
-            # 追蹤化整為零的四大指標
             norm_name = self.normalize_for_tracking(item.get('cne_name'))
             norm_addr = self.normalize_for_tracking(item.get('cne_addr'))
             norm_vat = self.normalize_for_tracking(item.get('cne_vat'))
@@ -463,11 +496,9 @@ class SeaExpressEngine:
                     i.processing_status = "MANUAL_REQUIRED"
             elif len(carton_counts) == 1:
                 c_val = float(carton_counts[0].cartons)
-                # 超標箱數提示
                 if check_carton and c_val > limit_carton:
                     for i in items: i.warnings.append(f"總箱數超過 {limit_carton} 箱 (目前 {c_val}箱)")
                 
-                # 單件重量嚴格防呆 (> 65KG)
                 if c_val == 1.0:
                     if max_gw > 65 or total_nw > 65:
                         for i in items:
@@ -482,7 +513,6 @@ class SeaExpressEngine:
             if any(i.processing_status == "MANUAL_REQUIRED" for i in items):
                 for i in items: i.processing_status = "MANUAL_REQUIRED"
 
-        # 化整為零整合判斷
         suspicious_groups = {}
         if check_split:
             for k, hawbs in consignee_tracker.items():
@@ -515,11 +545,27 @@ class SeaExpressEngine:
                     if not order._split_group_key:
                         order._split_group_key = key
 
-        # 排序機制：讓化整為零的單據排最前面且群組相鄰
+        # 🌟 修復 1：三層置頂排序機制 (化整為零 > 一般異常 > 正常放行)
+        hawb_status_map = {}
+        for o in orders:
+            if o.processing_status == "MANUAL_REQUIRED":
+                hawb_status_map[o.hawb_no] = True
+        
+        for o in orders:
+            if hawb_status_map.get(o.hawb_no):
+                o.processing_status = "MANUAL_REQUIRED"
+
         def sort_key(ord_obj):
-            is_split = 0 if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key else 1
-            group_val = ord_obj._split_group_key if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key else ""
-            return (is_split, group_val, ord_obj.hawb_no or "", ord_obj.item_no or 0)
+            if ord_obj.processing_status == "MANUAL_REQUIRED":
+                if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key:
+                    priority = 0
+                else:
+                    priority = 1
+            else:
+                priority = 2
+                
+            group_val = getattr(ord_obj, '_split_group_key', "") or ""
+            return (priority, group_val, ord_obj.hawb_no or "", ord_obj.item_no or 0)
             
         orders.sort(key=sort_key)
 

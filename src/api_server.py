@@ -17,12 +17,10 @@ import io
 import urllib.parse
 import pandas as pd
 
-# 匯入資料庫與驗證模組
 from database_models import SessionLocal, User, SeaExpressOrder, AuditLog, StandardKnowledgeBase, BlacklistKeyword
 from auth import verify_password
 from core_engine import SeaExpressEngine
 
-# --- JWT 設定 ---
 SECRET_KEY = "your_super_secret_key_change_this_in_production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 720 
@@ -68,12 +66,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None or not user.is_active: raise credentials_exception
     return user
 
-# ==========================================
-# 輔助函式區
-# ==========================================
-
 def normalize_kb_text(text_str):
-    """清洗原始品名，確保 AI 學習時的 Key 與匯入比對時完全一致"""
     if not text_str or pd.isna(text_str): return ""
     val = unicodedata.normalize('NFKC', str(text_str)).upper()
     if '/' in val: val = val.split('/')[-1]
@@ -81,31 +74,20 @@ def normalize_kb_text(text_str):
     return re.sub(r'\s+', ' ', val).strip()
 
 def format_ccc_for_kb(ccc_str):
-    """確保操作員手寫的稅則號被格式化成標準 11 碼格式再存入腦袋"""
     if not ccc_str: return None
     clean_str = re.sub(r'\D', '', str(ccc_str))
-    if len(clean_str) != 11: return ccc_str 
+    if len(clean_str) != 11: return ccc_str
     return f"{clean_str[:4]}.{clean_str[4:6]}.{clean_str[6:8]}.{clean_str[8:10]}-{clean_str[10]}"
 
 def parse_tax_rate(rate_str):
-    """
-    從複雜字串中抓取最大的百分比 (如 '14%' -> 0.14)，
-    如果包含 '免稅' 或找不到數字則回傳 0.0。
-    """
     if not rate_str or rate_str == '免稅':
         return 0.0
-    
     matches = re.findall(r'(\d+(\.\d+)?)%', str(rate_str))
     if matches:
         percentages = [float(m[0]) for m in matches]
         return max(percentages) / 100.0
-    
     return 0.0
 
-
-# ==========================================
-# 登入 API
-# ==========================================
 @app.post("/api/login")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
@@ -120,22 +102,19 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def read_users_me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "role": current_user.role}
 
-
-# ==========================================
-# 業務 API
-# ==========================================
 @app.get("/api/mawbs")
 def get_mawbs(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """取得資料庫中所有的主提單號 (MAWB) 清單"""
     mawbs = db.query(SeaExpressOrder.mawb_no).distinct().order_by(SeaExpressOrder.mawb_no.desc()).all()
     return [m[0] for m in mawbs if m[0]]
 
 @app.get("/api/orders")
 def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """依照 MAWB 取得訂單，並以 HAWB 為單位分組，同時計算預計稅金"""
     if not mawb_no: return []
         
     orders = db.query(SeaExpressOrder).filter(SeaExpressOrder.mawb_no == mawb_no).order_by(SeaExpressOrder.id).all()
+    
+    # 實例化引擎，用於動態獲取 AI 歷史推薦名單
+    engine = SeaExpressEngine()
     
     hawb_groups = {}
     for o in orders:
@@ -152,7 +131,7 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
                 "cartons": o.cartons,
                 "warnings": [],
                 "total_amount": 0,
-                "estimated_tax": 0.0, 
+                "estimated_tax": 0.0,
                 "items": []
             }
         
@@ -168,6 +147,11 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
 
         hawb_groups[o.hawb_no]["total_amount"] += (o.total_amount or 0)
         
+        # 🌟 若有異常，即時獲取 AI 候選清單
+        candidates = []
+        if o.processing_status == "MANUAL_REQUIRED" and (not o.ccc_code or "模糊" in str(o.warnings) or "查無" in str(o.warnings)):
+            candidates = engine.get_candidates(o.description_original)
+            
         hawb_groups[o.hawb_no]["items"].append({
             "id": o.id,
             "item_no": o.item_no,
@@ -177,7 +161,8 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
             "qty": o.qty,
             "unit_price": o.unit_price,
             "total_amount": o.total_amount,
-            "net_weight": o.net_weight
+            "net_weight": o.net_weight,
+            "candidates": candidates
         })
 
     for group in hawb_groups.values():
@@ -186,12 +171,9 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
         
         if hawb_total >= 2000:
             total_import_duty = 0.0
-            
             for item in group["items"]:
                 if item["ccc_code"]:
-                    kb_entry = db.query(StandardKnowledgeBase).filter(
-                        StandardKnowledgeBase.ccc_code == item["ccc_code"]
-                    ).first()
+                    kb_entry = db.query(StandardKnowledgeBase).filter(StandardKnowledgeBase.ccc_code == item["ccc_code"]).first()
                     rate_str = kb_entry.tax_rate_1 if kb_entry else '0%'
                 else:
                     rate_str = '0%'
@@ -216,7 +198,6 @@ async def upload_excel(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """上傳 Excel 並由核心引擎進行智慧審核"""
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     upload_dir = os.path.join(BASE_DIR, "uploads", "daily_excel")
     os.makedirs(upload_dir, exist_ok=True)
@@ -232,16 +213,13 @@ async def upload_excel(
         except Exception as e:
             pass
 
-    engine = SeaExpressEngine()
-    success, msg = engine.process_and_save(file_location, mawb_no, import_mode=import_mode, operator_id=current_user.id, rules_config=config_dict)
+    import_engine = SeaExpressEngine()
+    success, msg = import_engine.process_and_save(file_location, mawb_no, import_mode=import_mode, operator_id=current_user.id, rules_config=config_dict)
     
     if not success: raise HTTPException(status_code=400, detail=msg)
     return {"message": "匯入成功", "detail": msg}
 
 
-# ==========================================
-# 人工修改 Pydantic 模型定義
-# ==========================================
 class ItemUpdate(BaseModel):
     id: int
     description_original: str
@@ -273,7 +251,6 @@ class HAWBUpdate(BaseModel):
 
 @app.put("/api/hawb/{hawb_no}")
 def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """以 HAWB 為單位修改，並啟動 AI 即時自學習機制"""
     orders = db.query(SeaExpressOrder).filter(SeaExpressOrder.hawb_no == hawb_no, SeaExpressOrder.mawb_no == update_data.mawb_no).all()
     if not orders:
         raise HTTPException(status_code=404, detail="找不到該分提單資料")
@@ -281,7 +258,7 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
     old_data = [{"id": o.id, "desc": o.description_original, "ccc": o.ccc_code, "price": o.unit_price, "qty": o.qty} for o in orders]
     item_updates_dict = {item.id: item for item in update_data.items}
     
-    learned_count = 0 
+    learned_count = 0
     local_kb_cache = {} 
 
     for order in orders:
@@ -357,16 +334,13 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
         
     return {"message": msg}
 
-# ==========================================
-# 黑名單管理 API
-# ==========================================
-class BlacklistCreate(BaseModel):
-    keyword: str
-
 @app.get("/api/blacklist")
 def get_blacklist(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     items = db.query(BlacklistKeyword).order_by(BlacklistKeyword.id.desc()).all()
     return [{"id": i.id, "keyword": i.keyword, "created_at": i.created_at} for i in items]
+
+class BlacklistCreate(BaseModel):
+    keyword: str
 
 @app.post("/api/blacklist")
 def add_blacklist(item: BlacklistCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -389,12 +363,8 @@ def delete_blacklist(item_id: int, current_user: User = Depends(get_current_user
     db.commit()
     return {"message": "刪除成功"}
 
-# ==========================================
-# 匯出標準報關單 API
-# ==========================================
 @app.get("/api/export/{mawb_no}")
 def export_mawb_excel(mawb_no: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """匯出指定 MAWB 的標準報關 Excel 檔案"""
     orders = db.query(SeaExpressOrder).filter(SeaExpressOrder.mawb_no == mawb_no).order_by(SeaExpressOrder.hawb_no, SeaExpressOrder.item_no).all()
     
     if not orders:
@@ -448,9 +418,6 @@ def export_mawb_excel(mawb_no: str, current_user: User = Depends(get_current_use
         headers={"Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"}
     )
 
-# ==========================================
-# 靜態網頁託管
-# ==========================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "src", "static")
 os.makedirs(STATIC_DIR, exist_ok=True)

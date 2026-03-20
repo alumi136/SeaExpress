@@ -4,82 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>海快報關自動化系統</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         .hidden-view { display: none !important; }
-        
-        /* 類似 Shadcn UI 的自訂元件風格 */
         .shadcn-input {
-            width: 100%;
-            border-radius: 0.375rem;
-            border: 1px solid #e2e8f0;
-            background-color: transparent;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.875rem;
+            width: 100%; border-radius: 0.375rem; border: 1px solid #e2e8f0;
+            background-color: transparent; padding: 0.5rem 0.75rem; font-size: 0.875rem;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .shadcn-input:focus {
-            outline: none;
-            border-color: #0f172a;
-            box-shadow: 0 0 0 1px #0f172a;
-        }
-        .shadcn-input-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
-        }
+        .shadcn-input:focus { outline: none; border-color: #0f172a; box-shadow: 0 0 0 1px #0f172a; }
+        .shadcn-input-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .shadcn-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            transition: background-color 0.2s, color 0.2s;
-            cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500;
+            padding: 0.5rem 1rem; transition: background-color 0.2s, color 0.2s; cursor: pointer;
         }
-        .shadcn-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .shadcn-button-primary {
-            background-color: #0f172a;
-            color: #ffffff;
-        }
-        .shadcn-button-primary:hover:not(:disabled) {
-            background-color: #1e293b;
-        }
-        .shadcn-button-outline {
-            border: 1px solid #e2e8f0;
-            background-color: #ffffff;
-            color: #0f172a;
-        }
-        .shadcn-button-outline:hover:not(:disabled) {
-            background-color: #f8fafc;
-        }
-        .shadcn-button-destructive {
-            background-color: #ef4444;
-            color: #ffffff;
-        }
-        .shadcn-button-destructive:hover:not(:disabled) {
-            background-color: #dc2626;
-        }
-        
-        /* Loader Spinner */
+        .shadcn-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .shadcn-button-primary { background-color: #0f172a; color: #ffffff; }
+        .shadcn-button-primary:hover:not(:disabled) { background-color: #1e293b; }
+        .shadcn-button-outline { border: 1px solid #e2e8f0; background-color: #ffffff; color: #0f172a; }
+        .shadcn-button-outline:hover:not(:disabled) { background-color: #f8fafc; }
+        .shadcn-button-destructive { background-color: #ef4444; color: #ffffff; }
+        .shadcn-button-destructive:hover:not(:disabled) { background-color: #dc2626; }
         .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 3px solid #ffffff;
-            width: 24px;
-            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            border-top: 3px solid #ffffff; width: 24px; height: 24px;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* 表格樣式 */
         table { border-collapse: collapse; width: 100%; }
         th { background-color: #f8fafc; position: sticky; top: 0; z-index: 10; }
         th, td { border-bottom: 1px solid #e2e8f0; padding: 0.75rem 1rem; text-align: left; }
@@ -88,13 +41,12 @@
 </head>
 <body class="bg-gray-50 text-slate-900 font-sans min-h-screen flex flex-col">
 
-    <!-- 全域 Loader Overlay -->
     <div id="global-loader" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden-view z-[100] flex flex-col items-center justify-center text-white">
         <div class="spinner mb-4 w-12 h-12 border-4"></div>
         <h2 id="loader-text" class="text-xl font-bold tracking-wider">處理中...</h2>
     </div>
 
-    <!-- 1. 登入畫面 -->
+    <!-- 登入畫面 -->
     <div id="login-view" class="flex-1 flex items-center justify-center hidden-view">
         <div class="bg-white p-8 rounded-xl shadow-lg border border-slate-100 w-full max-w-md">
             <div class="flex justify-center mb-6 text-slate-800">
@@ -115,14 +67,11 @@
         </div>
     </div>
 
-    <!-- 2. 主系統畫面 -->
+    <!-- 主系統畫面 -->
     <div id="main-view" class="flex-1 flex flex-col hidden-view h-screen overflow-hidden">
-        <!-- Header -->
         <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
             <div class="flex items-center space-x-3">
-                <div class="bg-slate-900 text-white p-2 rounded-lg">
-                    <i data-lucide="ship" class="w-5 h-5"></i>
-                </div>
+                <div class="bg-slate-900 text-white p-2 rounded-lg"><i data-lucide="ship" class="w-5 h-5"></i></div>
                 <h1 class="text-xl font-bold text-slate-800 tracking-tight">海快報關自動化系統</h1>
             </div>
             <div class="flex items-center space-x-4">
@@ -140,7 +89,6 @@
             </div>
         </header>
 
-        <!-- 工具列 (Action Bar) -->
         <div class="bg-white px-6 py-4 border-b border-slate-200 shrink-0 flex items-center justify-between shadow-sm z-10">
             <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
@@ -153,7 +101,6 @@
                     <i data-lucide="refresh-cw" class="w-5 h-5"></i>
                 </button>
             </div>
-
             <div class="flex items-center space-x-3">
                 <button onclick="openImportModal()" class="shadcn-button shadcn-button-outline text-indigo-600 border-indigo-200 hover:bg-indigo-50">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-2"></i>匯入客戶 Excel
@@ -164,9 +111,7 @@
             </div>
         </div>
 
-        <!-- 統計與資料表格區 -->
         <main class="flex-1 overflow-auto bg-slate-50 p-6">
-            <!-- 統計卡片 -->
             <div id="stats-container" class="grid grid-cols-4 gap-4 mb-6 hidden-view">
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center">
                     <div class="p-3 bg-blue-50 text-blue-600 rounded-lg mr-4"><i data-lucide="package" class="w-6 h-6"></i></div>
@@ -186,7 +131,6 @@
                 </div>
             </div>
 
-            <!-- 表格 -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                 <div class="overflow-x-auto max-h-[calc(100vh-320px)]">
                     <table class="w-full text-sm">
@@ -212,8 +156,6 @@
         </main>
     </div>
 
-    <!-- ================= Modals 區塊 ================= -->
-
     <!-- 匯入 Excel Modal -->
     <div id="import-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden-view z-50 flex items-center justify-center">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
@@ -221,13 +163,11 @@
                 <h3 class="text-lg font-bold flex items-center"><i data-lucide="file-up" class="w-5 h-5 mr-2 text-indigo-600"></i>匯入客戶 Excel</h3>
                 <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            
             <form id="importForm" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">選擇 Excel 檔案 (.xlsx, .csv)</label>
                     <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="shadcn-input p-1.5" required>
                 </div>
-                
                 <div>
                     <label class="block text-sm font-medium mb-1">匯入模式</label>
                     <select id="importMode" class="shadcn-input" onchange="toggleImportMode()">
@@ -235,18 +175,14 @@
                         <option value="APPEND">附加到現存主單號 (MAWB)</option>
                     </select>
                 </div>
-                
                 <div id="divNewMawb" class="space-y-1">
                     <label class="block text-sm font-medium text-slate-700">自訂主單號 (若留空將自動偵測)</label>
                     <input type="text" id="newMawbInput" class="shadcn-input" placeholder="例如: IPC250426401EX">
                 </div>
-                
                 <div id="divExistMawb" class="space-y-1 hidden">
                     <label class="block text-sm font-medium text-amber-600">選擇目標主單號</label>
                     <select id="existMawbSelect" class="shadcn-input"></select>
                 </div>
-                
-                <!-- 進階防呆設定 (已合併化整為零設定) -->
                 <div class="mt-4 border-t border-slate-200 pt-4">
                     <h4 class="text-sm font-bold text-slate-700 flex items-center mb-3"><i data-lucide="settings-2" class="w-4 h-4 mr-1 text-slate-500"></i> 進階防呆檢核設定</h4>
                     <div class="space-y-3 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -273,7 +209,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="pt-4 flex justify-end space-x-2 border-t border-slate-100">
                     <button type="button" onclick="closeImportModal()" class="shadcn-button shadcn-button-outline">取消</button>
                     <button type="submit" class="shadcn-button shadcn-button-primary bg-indigo-600 hover:bg-indigo-700">開始匯入審核</button>
@@ -289,7 +224,6 @@
                 <h3 class="text-lg font-bold flex items-center text-red-700"><i data-lucide="shield-ban" class="w-5 h-5 mr-2"></i>品名黑名單管理</h3>
                 <button onclick="closeBlacklistModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            
             <div class="p-5 shrink-0 bg-slate-50 border-b border-slate-200">
                 <form id="addBlacklistForm" class="flex items-end space-x-2" onsubmit="addBlacklistKeyword(event)">
                     <div class="flex-1">
@@ -299,7 +233,6 @@
                     <button type="submit" class="shadcn-button shadcn-button-destructive px-6">新增</button>
                 </form>
             </div>
-
             <div class="flex-1 overflow-auto p-0">
                 <table class="w-full text-sm">
                     <thead class="bg-white">
@@ -319,18 +252,15 @@
 
     <!-- 人工修改單據 Modal -->
     <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden-view z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-full">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl flex flex-col max-h-full">
             <div class="p-5 border-b border-slate-200 flex justify-between items-center shrink-0 bg-rose-50 rounded-t-xl">
                 <h3 class="text-lg font-bold text-rose-800 flex items-center">
                     <i data-lucide="edit-3" class="w-5 h-5 mr-2"></i>人工審核與修正 - HAWB: <span id="editHawbTitle" class="ml-2 font-mono"></span>
                 </h3>
                 <button onclick="closeManualEditModal()" class="text-rose-400 hover:text-rose-700"><i data-lucide="x" class="w-6 h-6"></i></button>
             </div>
-            
             <div class="flex-1 overflow-auto p-6">
-                <!-- 警告訊息提示區 -->
                 <div id="editWarningBox" class="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-800 rounded-r text-sm font-medium"></div>
-                
                 <h4 class="font-bold text-slate-800 mb-3 border-b pb-2 flex items-center"><i data-lucide="user" class="w-4 h-4 mr-2"></i>分單共用資訊 (收件人/重量/箱數)</h4>
                 <div class="grid grid-cols-5 gap-4 mb-8">
                     <div class="col-span-2">
@@ -365,9 +295,9 @@
                         <thead class="bg-slate-50">
                             <tr>
                                 <th class="w-12 text-center p-2">項次</th>
-                                <th class="p-2">原始品名 (不可改)</th>
-                                <th class="p-2 w-48 text-indigo-700">正式通關品名</th>
-                                <th class="p-2 w-32 text-indigo-700">CCC 稅則號列</th>
+                                <th class="p-2 w-64">原始品名 (不可改)</th>
+                                <th class="p-2 text-indigo-700">正式通關品名 (含 AI 推薦)</th>
+                                <th class="p-2 w-40 text-indigo-700">CCC 稅則號列</th>
                                 <th class="p-2 w-20 text-right">數量</th>
                                 <th class="p-2 w-24 text-right">單價</th>
                                 <th class="p-2 w-24 text-right">總價</th>
@@ -378,7 +308,6 @@
                     </table>
                 </div>
             </div>
-
             <div class="p-5 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-between items-center rounded-b-xl">
                 <div class="text-sm text-slate-500 flex items-center">
                     <i data-lucide="info" class="w-4 h-4 mr-1"></i> 修改正式品名與稅則後，AI 將自動學習該對應關係。
@@ -393,27 +322,20 @@
         </div>
     </div>
 
-    <!-- JavaScript 邏輯 -->
     <script>
-        // --- 核心變數 ---
         const API_URL = ''; 
         let currentMawb = '';
         let currentOrdersData = [];
         let editCurrentHawbGroup = null;
 
-        // 初始化 Icons
         lucide.createIcons();
 
-        // --- Loader 控制 ---
         function showLoader(text = '處理中...') {
             document.getElementById('loader-text').innerText = text;
             document.getElementById('global-loader').classList.remove('hidden-view');
         }
-        function hideLoader() {
-            document.getElementById('global-loader').classList.add('hidden-view');
-        }
+        function hideLoader() { document.getElementById('global-loader').classList.add('hidden-view'); }
 
-        // --- API 請求工具 (自動帶 Token) ---
         async function fetchAPI(endpoint, options = {}) {
             const token = localStorage.getItem('access_token');
             const headers = options.headers || {};
@@ -433,14 +355,12 @@
             return response;
         }
 
-        // --- 登入邏輯 ---
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             showLoader("登入中...");
             const fd = new URLSearchParams();
             fd.append('username', document.getElementById('loginUser').value);
             fd.append('password', document.getElementById('loginPass').value);
-
             try {
                 const res = await fetch(API_URL + '/api/login', {
                     method: 'POST',
@@ -451,14 +371,8 @@
                 if (res.ok) {
                     localStorage.setItem('access_token', data.access_token);
                     checkAuth();
-                } else {
-                    alert(data.detail || "登入失敗");
-                }
-            } catch (err) {
-                alert("伺服器連線失敗");
-            } finally {
-                hideLoader();
-            }
+                } else { alert(data.detail || "登入失敗"); }
+            } catch (err) { alert("伺服器連線失敗"); } finally { hideLoader(); }
         });
 
         function logout() {
@@ -472,7 +386,6 @@
         async function checkAuth() {
             const token = localStorage.getItem('access_token');
             if (!token) { logout(); return; }
-
             try {
                 const res = await fetchAPI('/api/me');
                 if (res.ok) {
@@ -481,45 +394,30 @@
                     document.getElementById('login-view').classList.add('hidden-view');
                     document.getElementById('main-view').classList.remove('hidden-view');
                     loadMawbs();
-                } else {
-                    logout();
-                }
-            } catch (err) {
-                logout();
-            }
+                } else { logout(); }
+            } catch (err) { logout(); }
         }
 
-        // --- 資料載入邏輯 ---
         async function loadMawbs() {
             try {
                 const res = await fetchAPI('/api/mawbs');
                 if (!res.ok) return;
                 const mawbs = await res.json();
-                
                 const select = document.getElementById('mawb-select');
                 const existSelect = document.getElementById('existMawbSelect');
-                
-                // 記住當前選擇
                 const currentVal = select.value;
                 
                 let optionsHtml = '<option value="">-- 請選擇主單號 --</option>';
                 let existOptionsHtml = '';
-                
                 mawbs.forEach(m => {
                     const opt = `<option value="${m}">${m}</option>`;
-                    optionsHtml += opt;
-                    existOptionsHtml += opt;
+                    optionsHtml += opt; existOptionsHtml += opt;
                 });
+                select.innerHTML = optionsHtml; existSelect.innerHTML = existOptionsHtml;
                 
-                select.innerHTML = optionsHtml;
-                existSelect.innerHTML = existOptionsHtml;
-                
-                if (currentVal && mawbs.includes(currentVal)) {
-                    select.value = currentVal;
-                } else if (mawbs.length > 0) {
-                    select.value = mawbs[0]; // 預設選最新
-                    loadOrders();
-                } else {
+                if (currentVal && mawbs.includes(currentVal)) { select.value = currentVal; } 
+                else if (mawbs.length > 0) { select.value = mawbs[0]; loadOrders(); } 
+                else {
                     document.getElementById('orders-tbody').innerHTML = '<tr><td colspan="9" class="text-center py-12 text-slate-500">目前無資料</td></tr>';
                     updateStats(null);
                 }
@@ -534,72 +432,50 @@
             
             if (!mawb) {
                 tbody.innerHTML = '<tr><td colspan="9" class="text-center py-12 text-slate-500">請從上方選擇主單號以載入資料</td></tr>';
-                btnExport.disabled = true;
-                updateStats(null);
-                return;
+                btnExport.disabled = true; updateStats(null); return;
             }
-
             showLoader("載入資料中...");
             try {
                 const res = await fetchAPI(`/api/orders?mawb_no=${mawb}`);
                 if (!res.ok) throw new Error();
                 currentOrdersData = await res.json();
-                
                 renderOrdersTable();
                 updateStats(currentOrdersData);
-                
-                // 檢查是否全部 PROCESSED 決定能否匯出
                 const allProcessed = currentOrdersData.length > 0 && currentOrdersData.every(g => g.processing_status === 'PROCESSED');
                 btnExport.disabled = !allProcessed;
-                
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-12 text-red-500">載入失敗</td></tr>';
-            } finally {
-                hideLoader();
-            }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="9" class="text-center py-12 text-red-500">載入失敗</td></tr>'; } 
+            finally { hideLoader(); }
         }
 
         function renderOrdersTable() {
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
-            
             if (currentOrdersData.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="9" class="text-center py-12 text-slate-500">該主單號無資料</td></tr>';
                 return;
             }
-
             currentOrdersData.forEach(group => {
                 const isWarn = group.processing_status === 'MANUAL_REQUIRED';
                 const statusHtml = isWarn 
                     ? `<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-100 text-rose-600" title="異常"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>`
                     : `<div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-600" title="正常"><i data-lucide="check" class="w-4 h-4"></i></div>`;
                 
-                // 化整為零視覺強化
                 const isSplit = group.warnings.some(w => w.includes('化整為零'));
                 const trClass = isSplit ? 'bg-amber-50/50' : (isWarn ? 'bg-rose-50/30' : '');
-
                 let warnList = '';
                 if (group.warnings.length > 0) {
-                    warnList = `<ul class="list-disc pl-4 text-xs text-rose-600 font-medium space-y-1">` + 
-                               group.warnings.map(w => `<li>${w}</li>`).join('') + 
-                               `</ul>`;
+                    warnList = `<ul class="list-disc pl-4 text-xs text-rose-600 font-medium space-y-1">` + group.warnings.map(w => `<li>${w}</li>`).join('') + `</ul>`;
                 } else {
                     warnList = `<span class="text-emerald-600 text-xs font-medium">資料完整，AI 審核通過</span>`;
                 }
-
-                // 顯示統編
                 const vatStr = group.consignee_vat_no ? `<br><span class="text-xs text-slate-500">統編: ${group.consignee_vat_no}</span>` : '';
-
+                
                 const tr = document.createElement('tr');
                 if(trClass) tr.className = trClass;
                 tr.innerHTML = `
                     <td class="text-center">${statusHtml}</td>
                     <td class="font-mono font-medium">${group.hawb_no}</td>
-                    <td class="text-sm">
-                        <div class="font-bold">${group.consignee_name}</div>
-                        <div class="text-slate-500">${group.consignee_phone}</div>
-                        ${vatStr}
-                    </td>
+                    <td class="text-sm"><div class="font-bold">${group.consignee_name}</div><div class="text-slate-500">${group.consignee_phone}</div>${vatStr}</td>
                     <td class="text-right font-medium">${(group.gross_weight || 0).toFixed(2)}</td>
                     <td class="text-right">${group.cartons || 0}</td>
                     <td class="text-right font-medium text-slate-700">${group.total_amount.toLocaleString()}</td>
@@ -618,69 +494,43 @@
 
         function updateStats(data) {
             const container = document.getElementById('stats-container');
-            if (!data) {
-                container.classList.add('hidden-view');
-                return;
-            }
+            if (!data) { container.classList.add('hidden-view'); return; }
             container.classList.remove('hidden-view');
-            
             const total = data.length;
             const ok = data.filter(g => g.processing_status === 'PROCESSED').length;
             const warn = data.filter(g => g.processing_status === 'MANUAL_REQUIRED').length;
             const tax = data.reduce((sum, g) => sum + (g.estimated_tax || 0), 0);
-            
             document.getElementById('stat-total').innerText = total;
             document.getElementById('stat-ok').innerText = ok;
             document.getElementById('stat-warn').innerText = warn;
             document.getElementById('stat-tax').innerText = Math.round(tax).toLocaleString();
         }
 
-        // --- 匯入 Excel 邏輯 ---
         function loadImportSettings() {
-            const defaultSettings = {
-                chk_amount: true, val_amount: 48000,
-                chk_carton: true, val_carton: 6,
-                chk_split_shipment: true, val_split_shipment: 3
-            };
+            const defaultSettings = { chk_amount: true, val_amount: 48000, chk_carton: true, val_carton: 6, chk_split_shipment: true, val_split_shipment: 3 };
             const settings = JSON.parse(localStorage.getItem('seaExpressImportSettings')) || defaultSettings;
-            
-            document.getElementById('chk_amount').checked = settings.chk_amount;
-            document.getElementById('val_amount').value = settings.val_amount;
-            document.getElementById('chk_carton').checked = settings.chk_carton;
-            document.getElementById('val_carton').value = settings.val_carton;
-            // 統一化整為零設定
+            document.getElementById('chk_amount').checked = settings.chk_amount; document.getElementById('val_amount').value = settings.val_amount;
+            document.getElementById('chk_carton').checked = settings.chk_carton; document.getElementById('val_carton').value = settings.val_carton;
             document.getElementById('chk_split_shipment').checked = settings.chk_split_shipment !== undefined ? settings.chk_split_shipment : true;
             document.getElementById('val_split_shipment').value = settings.val_split_shipment || 3;
         }
 
         function saveImportSettings() {
             const settings = {
-                chk_amount: document.getElementById('chk_amount').checked,
-                val_amount: document.getElementById('val_amount').value,
-                chk_carton: document.getElementById('chk_carton').checked,
-                val_carton: document.getElementById('val_carton').value,
-                chk_split_shipment: document.getElementById('chk_split_shipment').checked,
-                val_split_shipment: document.getElementById('val_split_shipment').value
+                chk_amount: document.getElementById('chk_amount').checked, val_amount: document.getElementById('val_amount').value,
+                chk_carton: document.getElementById('chk_carton').checked, val_carton: document.getElementById('val_carton').value,
+                chk_split_shipment: document.getElementById('chk_split_shipment').checked, val_split_shipment: document.getElementById('val_split_shipment').value
             };
             localStorage.setItem('seaExpressImportSettings', JSON.stringify(settings));
             return settings;
         }
 
-        function openImportModal() { 
-            document.getElementById('import-modal').classList.remove('hidden-view'); 
-            document.getElementById('importFile').value = ''; 
-            toggleImportMode(); 
-            loadImportSettings();
-        }
+        function openImportModal() { document.getElementById('import-modal').classList.remove('hidden-view'); document.getElementById('importFile').value = ''; toggleImportMode(); loadImportSettings(); }
         function closeImportModal() { document.getElementById('import-modal').classList.add('hidden-view'); }
-        
         function toggleImportMode() {
             const mode = document.getElementById('importMode').value;
-            if (mode === 'NEW') {
-                document.getElementById('divNewMawb').classList.remove('hidden'); document.getElementById('divExistMawb').classList.add('hidden');
-            } else {
-                document.getElementById('divNewMawb').classList.add('hidden'); document.getElementById('divExistMawb').classList.remove('hidden');
-            }
+            if (mode === 'NEW') { document.getElementById('divNewMawb').classList.remove('hidden'); document.getElementById('divExistMawb').classList.add('hidden'); } 
+            else { document.getElementById('divNewMawb').classList.add('hidden'); document.getElementById('divExistMawb').classList.remove('hidden'); }
         }
 
         document.getElementById('importForm').addEventListener('submit', async (e) => {
@@ -692,97 +542,91 @@
             if (!mawb) { alert('無法取得主單號'); return; }
 
             const rulesConfig = saveImportSettings();
-
-            closeImportModal();
-            showLoader("上傳與 AI 審核中...");
+            closeImportModal(); showLoader("上傳與 AI 審核中...");
 
             const formData = new FormData();
-            formData.append('file', file);
-            formData.append('mawb_no', mawb);
-            formData.append('import_mode', mode);
-            formData.append('rules_config', JSON.stringify(rulesConfig));
+            formData.append('file', file); formData.append('mawb_no', mawb);
+            formData.append('import_mode', mode); formData.append('rules_config', JSON.stringify(rulesConfig));
 
             try {
                 const res = await fetchAPI('/api/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-                if (res.ok) {
-                    alert("匯入成功!\n" + data.detail);
-                    await loadMawbs();
-                    document.getElementById('mawb-select').value = mawb;
-                    loadOrders();
-                } else {
-                    alert("匯入失敗: " + (data.detail || "未知錯誤"));
-                }
-            } catch (err) {
-                alert("伺服器連線錯誤");
-            } finally {
-                hideLoader();
-            }
+                if (res.ok) { alert("匯入成功!\n" + data.detail); await loadMawbs(); document.getElementById('mawb-select').value = mawb; loadOrders(); } 
+                else { alert("匯入失敗: " + (data.detail || "未知錯誤")); }
+            } catch (err) { alert("伺服器連線錯誤"); } finally { hideLoader(); }
         });
 
-        // --- 匯出 Excel ---
         async function exportExcel() {
             if (!currentMawb) return;
             showLoader("產生報表中...");
             try {
                 const res = await fetchAPI(`/api/export/${currentMawb}`);
                 if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `海快報關資料_${currentMawb}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                } else {
-                    const data = await res.json();
-                    alert("匯出失敗: " + (data.detail || ""));
-                }
-            } catch (e) {
-                alert("下載失敗");
-            } finally {
-                hideLoader();
-            }
+                    const blob = await res.blob(); const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `海快報關資料_${currentMawb}.xlsx`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                } else { const data = await res.json(); alert("匯出失敗: " + (data.detail || "")); }
+            } catch (e) { alert("下載失敗"); } finally { hideLoader(); }
         }
 
-        // --- 人工修改 HAWB ---
+        // 🌟 災情二修復：輔助函數 - 點擊下拉選單後自動帶入品名與稅號
+        function applyCandidate(itemId, val) {
+            if(!val) return;
+            const parts = val.split('|');
+            document.getElementById(`editItemDesc_${itemId}`).value = parts[0];
+            document.getElementById(`editItemCcc_${itemId}`).value = parts[1];
+        }
+
         function openManualEditModal(hawb_no) {
             const group = currentOrdersData.find(g => g.hawb_no === hawb_no);
             if (!group) return;
             editCurrentHawbGroup = group;
 
             document.getElementById('editHawbTitle').innerText = hawb_no;
-            
-            // 警告區
             const warnBox = document.getElementById('editWarningBox');
             if (group.warnings.length > 0) {
-                warnBox.innerHTML = `<strong>系統攔截原因：</strong><ul class="list-disc pl-5 mt-1">` + 
-                    group.warnings.map(w => `<li>${w}</li>`).join('') + `</ul>`;
+                warnBox.innerHTML = `<strong>系統攔截原因：</strong><ul class="list-disc pl-5 mt-1">` + group.warnings.map(w => `<li>${w}</li>`).join('') + `</ul>`;
                 warnBox.classList.remove('hidden-view');
-            } else {
-                warnBox.classList.add('hidden-view');
-            }
+            } else { warnBox.classList.add('hidden-view'); }
 
-            // 基本資料
             document.getElementById('editCneName').value = group.consignee_name || '';
             document.getElementById('editCnePhone').value = group.consignee_phone || '';
             document.getElementById('editCneAddr').value = group.consignee_address || '';
-            document.getElementById('editCneVat').value = group.consignee_vat_no || ''; // 🌟 新增統編綁定
+            document.getElementById('editCneVat').value = group.consignee_vat_no || '';
             document.getElementById('editGW').value = group.gross_weight || 0;
             document.getElementById('editCartons').value = group.cartons || 0;
 
-            // 明細
             const tbody = document.getElementById('editItemsBody');
             tbody.innerHTML = '';
+            
             group.items.forEach((item, index) => {
+                // 🌟 災情二修復：若後端有回傳 AI 推薦清單，動態生成 <select> 給操作員點選
+                let descInputHtml = `<input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}">`;
+                let cccInputHtml = `<input type="text" id="editItemCcc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500 font-mono" value="${item.ccc_code || ''}" placeholder="11碼">`;
+                
+                if (item.candidates && item.candidates.length > 0) {
+                    let options = `<option value="">-- AI 歷史推薦選單 --</option>`;
+                    item.candidates.forEach(c => {
+                        options += `<option value="${c.official}|${c.ccc}">[推薦] ${c.official} (${c.ccc})</option>`;
+                    });
+                    
+                    descInputHtml = `
+                        <div class="flex flex-col space-y-1">
+                            <select class="shadcn-input p-1 border-indigo-200 text-xs bg-indigo-50 text-indigo-700 font-medium" onchange="applyCandidate(${item.id}, this.value)">
+                                ${options}
+                            </select>
+                            <input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}" placeholder="請點上方選單或手動輸入正式品名">
+                        </div>
+                    `;
+                }
+
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-slate-100 hover:bg-slate-50";
                 tr.innerHTML = `
                     <td class="text-center p-2 font-mono text-slate-500">${item.item_no}</td>
                     <td class="p-2 font-medium text-slate-700">${item.description_original}</td>
-                    <td class="p-2"><input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}"></td>
-                    <td class="p-2"><input type="text" id="editItemCcc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500 font-mono" value="${item.ccc_code || ''}" placeholder="11碼"></td>
+                    <td class="p-2">${descInputHtml}</td>
+                    <td class="p-2">${cccInputHtml}</td>
                     <td class="p-2"><input type="number" id="editItemQty_${item.id}" class="shadcn-input p-1 text-right" value="${item.qty}"></td>
                     <td class="p-2"><input type="number" id="editItemPrice_${item.id}" class="shadcn-input p-1 text-right" value="${item.unit_price}"></td>
                     <td class="p-2"><input type="number" id="editItemTotal_${item.id}" class="shadcn-input p-1 text-right" value="${item.total_amount}"></td>
@@ -794,20 +638,16 @@
             document.getElementById('edit-modal').classList.remove('hidden-view');
         }
 
-        function closeManualEditModal() {
-            document.getElementById('edit-modal').classList.add('hidden-view');
-            editCurrentHawbGroup = null;
-        }
+        function closeManualEditModal() { document.getElementById('edit-modal').classList.add('hidden-view'); editCurrentHawbGroup = null; }
 
         async function saveManualEdit() {
             if (!editCurrentHawbGroup) return;
-            
             const payload = {
                 mawb_no: editCurrentHawbGroup.mawb_no,
                 consignee_name: document.getElementById('editCneName').value,
                 consignee_phone: document.getElementById('editCnePhone').value,
                 consignee_address: document.getElementById('editCneAddr').value,
-                consignee_vat_no: document.getElementById('editCneVat').value, // 🌟 抓取統編
+                consignee_vat_no: document.getElementById('editCneVat').value,
                 gross_weight: parseFloat(document.getElementById('editGW').value) || null,
                 cartons: parseFloat(document.getElementById('editCartons').value) || null,
                 items: []
@@ -817,14 +657,10 @@
             editCurrentHawbGroup.items.forEach(item => {
                 const offDesc = document.getElementById(`editItemDesc_${item.id}`).value.trim();
                 const ccc = document.getElementById(`editItemCcc_${item.id}`).value.trim();
-                
                 if (!offDesc || !ccc) validationError = true;
-
                 payload.items.push({
-                    id: item.id,
-                    description_original: item.description_original,
-                    description_official: offDesc,
-                    ccc_code: ccc,
+                    id: item.id, description_original: item.description_original,
+                    description_official: offDesc, ccc_code: ccc,
                     qty: parseFloat(document.getElementById(`editItemQty_${item.id}`).value) || 0,
                     unit_price: parseFloat(document.getElementById(`editItemPrice_${item.id}`).value) || 0,
                     total_amount: parseFloat(document.getElementById(`editItemTotal_${item.id}`).value) || 0,
@@ -832,45 +668,23 @@
                 });
             });
 
-            if (validationError) {
-                if(!confirm("部分項次缺少「通關品名」或「稅則號」，確定要強制存檔嗎？這可能導致報關失敗。")) return;
-            }
+            if (validationError) { if(!confirm("部分項次缺少「通關品名」或「稅則號」，確定要強制存檔嗎？這可能導致報關失敗。")) return; }
 
             showLoader("儲存與 AI 學習中...");
             try {
-                const res = await fetchAPI(`/api/hawb/${editCurrentHawbGroup.hawb_no}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload)
-                });
-                
+                const res = await fetchAPI(`/api/hawb/${editCurrentHawbGroup.hawb_no}`, { method: 'PUT', body: JSON.stringify(payload) });
                 const data = await res.json();
-                if (res.ok) {
-                    alert(data.message);
-                    closeManualEditModal();
-                    loadOrders(); // 重新載入資料表
-                } else {
-                    // 🌟 捕捉 Pydantic 格式錯誤 (例如統編錯了)
+                if (res.ok) { alert(data.message); closeManualEditModal(); loadOrders(); } 
+                else {
                     let errMsg = data.detail || "儲存失敗";
-                    if (Array.isArray(data.detail)) {
-                        errMsg = data.detail.map(e => e.msg || e.type).join('\n');
-                    }
+                    if (Array.isArray(data.detail)) { errMsg = data.detail.map(e => e.msg || e.type).join('\n'); }
                     alert("資料驗證失敗:\n" + errMsg);
                 }
-            } catch (e) {
-                alert("伺服器連線失敗");
-            } finally {
-                hideLoader();
-            }
+            } catch (e) { alert("伺服器連線失敗"); } finally { hideLoader(); }
         }
 
-        // --- 🌟 黑名單管理邏輯 🌟 ---
-        function openBlacklistModal() {
-            document.getElementById('blacklist-modal').classList.remove('hidden-view');
-            loadBlacklist();
-        }
-        function closeBlacklistModal() {
-            document.getElementById('blacklist-modal').classList.add('hidden-view');
-        }
+        function openBlacklistModal() { document.getElementById('blacklist-modal').classList.remove('hidden-view'); loadBlacklist(); }
+        function closeBlacklistModal() { document.getElementById('blacklist-modal').classList.add('hidden-view'); }
 
         async function loadBlacklist() {
             const tbody = document.getElementById('blacklist-tbody');
@@ -879,13 +693,8 @@
                 const res = await fetchAPI('/api/blacklist');
                 if (!res.ok) throw new Error('載入失敗');
                 const data = await res.json();
-                
                 tbody.innerHTML = '';
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">目前無任何黑名單關鍵字</td></tr>';
-                    return;
-                }
-                
+                if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">目前無任何黑名單關鍵字</td></tr>'; return; }
                 data.forEach(item => {
                     const d = new Date(item.created_at);
                     const dateStr = `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
@@ -893,58 +702,32 @@
                         <tr class="border-b border-slate-100 hover:bg-slate-50">
                             <td class="p-3 font-medium text-slate-800">${item.keyword}</td>
                             <td class="p-3 text-slate-500">${dateStr}</td>
-                            <td class="p-3 text-center">
-                                <button onclick="deleteBlacklistKeyword(${item.id})" class="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded">刪除</button>
-                            </td>
+                            <td class="p-3 text-center"><button onclick="deleteBlacklistKeyword(${item.id})" class="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded">刪除</button></td>
                         </tr>
                     `;
                 });
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-rose-500">載入失敗</td></tr>';
-            }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-rose-500">載入失敗</td></tr>'; }
         }
 
         async function addBlacklistKeyword(e) {
-            e.preventDefault();
-            const kwInput = document.getElementById('newBlacklistKw');
-            const kw = kwInput.value.trim();
+            e.preventDefault(); const kwInput = document.getElementById('newBlacklistKw'); const kw = kwInput.value.trim();
             if (!kw) return;
-
             try {
-                const res = await fetchAPI('/api/blacklist', {
-                    method: 'POST',
-                    body: JSON.stringify({ keyword: kw })
-                });
+                const res = await fetchAPI('/api/blacklist', { method: 'POST', body: JSON.stringify({ keyword: kw }) });
                 const data = await res.json();
-                if (res.ok) {
-                    kwInput.value = '';
-                    loadBlacklist();
-                } else {
-                    alert(data.detail || "新增失敗");
-                }
-            } catch (err) {
-                alert("伺服器連線失敗");
-            }
+                if (res.ok) { kwInput.value = ''; loadBlacklist(); } else { alert(data.detail || "新增失敗"); }
+            } catch (err) { alert("伺服器連線失敗"); }
         }
 
         async function deleteBlacklistKeyword(id) {
             if (!confirm("確定要刪除此黑名單關鍵字嗎？")) return;
             try {
                 const res = await fetchAPI(`/api/blacklist/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                    loadBlacklist();
-                } else {
-                    const data = await res.json();
-                    alert(data.detail || "刪除失敗");
-                }
-            } catch (err) {
-                alert("伺服器連線失敗");
-            }
+                if (res.ok) { loadBlacklist(); } else { const data = await res.json(); alert(data.detail || "刪除失敗"); }
+            } catch (err) { alert("伺服器連線失敗"); }
         }
 
-        // 啟動時檢查是否已登入
         window.onload = checkAuth;
-
     </script>
 </body>
 </html>
