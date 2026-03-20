@@ -223,11 +223,11 @@ async def upload_excel(
     file: UploadFile = File(...),
     mawb_no: str = Form(...),
     import_mode: str = Form(...),
-    rules_config: str = Form(None), # 🌟 新增：接收前端設定
-    current_user: User = Depends(get_current_user),
+    rules_config: str = Form(None), 
+    current_user: User = Depends(get_current_user), # (這行如果您的變數名稱不同，請保留您原本的寫法)
     db: Session = Depends(get_db)
 ):
-    """上傳 Excel"""
+    """上傳 Excel 並由核心引擎進行智慧審核"""
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     upload_dir = os.path.join(BASE_DIR, "uploads", "daily_excel")
     os.makedirs(upload_dir, exist_ok=True)
@@ -236,7 +236,7 @@ async def upload_excel(
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
         
-    # 🌟 解析 JSON 設定字串
+    # 解析前端傳來的進階檢核設定 (JSON 字串)
     config_dict = {}
     if rules_config:
         try:
