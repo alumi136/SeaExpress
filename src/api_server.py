@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 from sqlalchemy.orm import Session
 import jwt
@@ -18,7 +18,7 @@ import urllib.parse
 import pandas as pd
 
 # 匯入資料庫與驗證模組
-from database_models import SessionLocal, User, SeaExpressOrder, AuditLog, StandardKnowledgeBase
+from database_models import SessionLocal, User, SeaExpressOrder, AuditLog, StandardKnowledgeBase, BlacklistKeyword
 from auth import verify_password
 from core_engine import SeaExpressEngine
 
@@ -84,7 +84,7 @@ def format_ccc_for_kb(ccc_str):
     """確保操作員手寫的稅則號被格式化成標準 11 碼格式再存入腦袋"""
     if not ccc_str: return None
     clean_str = re.sub(r'\D', '', str(ccc_str))
-    if len(clean_str) != 11: return ccc_str # 若非 11 碼原樣保留
+    if len(clean_str) != 11: return ccc_str 
     return f"{clean_str[:4]}.{clean_str[4:6]}.{clean_str[6:8]}.{clean_str[8:10]}-{clean_str[10]}"
 
 def parse_tax_rate(rate_str):
@@ -95,12 +95,9 @@ def parse_tax_rate(rate_str):
     if not rate_str or rate_str == '免稅':
         return 0.0
     
-    # 尋找所有像 2.5%, 14%, 0% 的數字
     matches = re.findall(r'(\d+(\.\d+)?)%', str(rate_str))
     if matches:
-        # matches 格式會是 [('2.5', '.5'), ('14', '')]，所以取 m[0]
         percentages = [float(m[0]) for m in matches]
-        # 取最大值並換算成小數
         return max(percentages) / 100.0
     
     return 0.0
@@ -138,7 +135,7 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
     """依照 MAWB 取得訂單，並以 HAWB 為單位分組，同時計算預計稅金"""
     if not mawb_no: return []
         
-    orders = db.query(SeaExpressOrder).filter(SeaExpressOrder.mawb_no == mawb_no).order_by(SeaExpressOrder.hawb_no, SeaExpressOrder.item_no).all()
+    orders = db.query(SeaExpressOrder).filter(SeaExpressOrder.mawb_no == mawb_no).order_by(SeaExpressOrder.id).all()
     
     hawb_groups = {}
     for o in orders:
@@ -150,11 +147,12 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
                 "consignee_name": o.consignee_name,
                 "consignee_phone": o.consignee_phone,
                 "consignee_address": o.consignee_address,
+                "consignee_vat_no": o.consignee_vat_no,
                 "gross_weight": o.gross_weight,
                 "cartons": o.cartons,
                 "warnings": [],
                 "total_amount": 0,
-                "estimated_tax": 0.0, # 預設稅金為 0
+                "estimated_tax": 0.0, 
                 "items": []
             }
         
@@ -182,36 +180,27 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
             "net_weight": o.net_weight
         })
 
-    # --- 🌟 計算預計稅金邏輯 🌟 ---
     for group in hawb_groups.values():
         hawb_total = group["total_amount"]
         hawb_tax = 0.0
         
-        # 免稅門檻判斷：總金額大於等於 2000 才需要算稅 (暫不考慮頻繁進口)
         if hawb_total >= 2000:
             total_import_duty = 0.0
             
             for item in group["items"]:
                 if item["ccc_code"]:
-                    # 去知識庫找尋這筆稅則的第一欄稅率
                     kb_entry = db.query(StandardKnowledgeBase).filter(
                         StandardKnowledgeBase.ccc_code == item["ccc_code"]
                     ).first()
-                    
                     rate_str = kb_entry.tax_rate_1 if kb_entry else '0%'
                 else:
                     rate_str = '0%'
 
                 rate_float = parse_tax_rate(rate_str)
-                
-                # 該 Item 的進口稅 = 該 Item 總價 * 稅率
                 item_duty = (item["total_amount"] or 0.0) * rate_float
                 total_import_duty += item_duty
                 
-            # 計算營業稅 = (完稅價格 + 進口稅) * 5%
             vat = (hawb_total + total_import_duty) * 0.05
-            
-            # 總稅金 = 進口稅 + 營業稅
             hawb_tax = total_import_duty + vat
             
         group["estimated_tax"] = hawb_tax
@@ -224,7 +213,7 @@ async def upload_excel(
     mawb_no: str = Form(...),
     import_mode: str = Form(...),
     rules_config: str = Form(None), 
-    current_user: User = Depends(get_current_user), # (這行如果您的變數名稱不同，請保留您原本的寫法)
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """上傳 Excel 並由核心引擎進行智慧審核"""
@@ -236,7 +225,6 @@ async def upload_excel(
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
         
-    # 解析前端傳來的進階檢核設定 (JSON 字串)
     config_dict = {}
     if rules_config:
         try:
@@ -245,7 +233,6 @@ async def upload_excel(
             pass
 
     engine = SeaExpressEngine()
-    # 🌟 將設定傳入核心引擎
     success, msg = engine.process_and_save(file_location, mawb_no, import_mode=import_mode, operator_id=current_user.id, rules_config=config_dict)
     
     if not success: raise HTTPException(status_code=400, detail=msg)
@@ -270,9 +257,19 @@ class HAWBUpdate(BaseModel):
     consignee_name: Optional[str] = None
     consignee_phone: Optional[str] = None
     consignee_address: Optional[str] = None
+    consignee_vat_no: Optional[str] = None
     gross_weight: Optional[float] = None
     cartons: Optional[float] = None
     items: List[ItemUpdate]
+
+    @validator('consignee_vat_no')
+    def validate_vat(cls, v):
+        if not v: return v
+        clean_vat = str(v).strip().upper()
+        if not clean_vat: return v
+        if not (re.match(r'^[A-Z]\d{9}$', clean_vat) or re.match(r'^\d{8}$', clean_vat)):
+            raise ValueError("統編或身分證格式錯誤！必須為 8 碼數字或 1 碼英文加 9 碼數字。")
+        return clean_vat
 
 @app.put("/api/hawb/{hawb_no}")
 def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -284,13 +281,14 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
     old_data = [{"id": o.id, "desc": o.description_original, "ccc": o.ccc_code, "price": o.unit_price, "qty": o.qty} for o in orders]
     item_updates_dict = {item.id: item for item in update_data.items}
     
-    learned_count = 0 # 紀錄 AI 這次學了幾個新單字
-    local_kb_cache = {} # 🌟 新增：本次交易的本地快取，防止同一筆分單內出現重複品名導致寫入衝突
+    learned_count = 0 
+    local_kb_cache = {} 
 
     for order in orders:
         order.consignee_name = update_data.consignee_name
         order.consignee_phone = update_data.consignee_phone
         order.consignee_address = update_data.consignee_address
+        order.consignee_vat_no = update_data.consignee_vat_no
         order.gross_weight = update_data.gross_weight
         order.cartons = update_data.cartons
         
@@ -304,13 +302,11 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
             order.total_amount = item_data.total_amount
             order.net_weight = item_data.net_weight
             
-            # --- 🌟 核心：AI 知識庫即時學習 (Upsert) 🌟 ---
             if item_data.description_official and item_data.ccc_code:
                 clean_orig_desc = normalize_kb_text(item_data.description_original)
                 clean_ccc = format_ccc_for_kb(item_data.ccc_code)
                 
                 if clean_orig_desc:
-                    # 🌟 改良：先檢查本次 Transaction 的本地快取，避免重複 Insert
                     if clean_orig_desc in local_kb_cache:
                         kb_entry = local_kb_cache[clean_orig_desc]
                         if kb_entry.ccc_code != clean_ccc or kb_entry.official_description != item_data.description_official:
@@ -319,11 +315,9 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
                             kb_entry.last_trained_at = datetime.utcnow()
                         kb_entry.frequency += 1
                     else:
-                        # 去知識庫找找看這東西有沒有學過
                         kb_entry = db.query(StandardKnowledgeBase).filter(StandardKnowledgeBase.original_description == clean_orig_desc).first()
                         
                         if kb_entry:
-                            # 學過但可能稅號改了，更新記憶並增加出現頻率
                             if kb_entry.ccc_code != clean_ccc or kb_entry.official_description != item_data.description_official:
                                 kb_entry.official_description = item_data.description_official
                                 kb_entry.ccc_code = clean_ccc
@@ -332,7 +326,6 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
                             kb_entry.frequency += 1
                             local_kb_cache[clean_orig_desc] = kb_entry
                         else:
-                            # 完全沒見過的新品名，寫入全新記憶！
                             new_kb = StandardKnowledgeBase(
                                 original_description=clean_orig_desc,
                                 official_description=item_data.description_official,
@@ -353,7 +346,7 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
         mawb_no=update_data.mawb_no,
         hawb_no=hawb_no,
         action="HAWB_MANUAL_OVERRIDE_AND_LEARN",
-        details={"old": old_data, "new": update_data.dict()}
+        details={"old": old_data, "new": update_data.model_dump() if hasattr(update_data, 'model_dump') else update_data.dict()}
     )
     db.add(audit_log)
     db.commit()
@@ -363,6 +356,38 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
         msg += f" (AI 已自動學習 {learned_count} 筆新詞彙)"
         
     return {"message": msg}
+
+# ==========================================
+# 黑名單管理 API
+# ==========================================
+class BlacklistCreate(BaseModel):
+    keyword: str
+
+@app.get("/api/blacklist")
+def get_blacklist(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    items = db.query(BlacklistKeyword).order_by(BlacklistKeyword.id.desc()).all()
+    return [{"id": i.id, "keyword": i.keyword, "created_at": i.created_at} for i in items]
+
+@app.post("/api/blacklist")
+def add_blacklist(item: BlacklistCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not item.keyword.strip():
+        raise HTTPException(status_code=400, detail="關鍵字不可為空")
+    existing = db.query(BlacklistKeyword).filter(BlacklistKeyword.keyword == item.keyword.strip()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="該關鍵字已存在")
+    new_kw = BlacklistKeyword(keyword=item.keyword.strip())
+    db.add(new_kw)
+    db.commit()
+    return {"message": "新增成功"}
+
+@app.delete("/api/blacklist/{item_id}")
+def delete_blacklist(item_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    kw = db.query(BlacklistKeyword).filter(BlacklistKeyword.id == item_id).first()
+    if not kw:
+        raise HTTPException(status_code=404, detail="找不到該關鍵字")
+    db.delete(kw)
+    db.commit()
+    return {"message": "刪除成功"}
 
 # ==========================================
 # 匯出標準報關單 API

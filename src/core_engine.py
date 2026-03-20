@@ -312,17 +312,14 @@ class SeaExpressEngine:
         if rules_config is None:
             rules_config = {}
             
-        # 讀取動態設定，若無則給予預設值
+        # 讀取動態設定，合併為單一門檻 (化整為零)
         check_amount = rules_config.get('chk_amount', True)
         limit_amount = float(rules_config.get('val_amount', 48000))
         check_carton = rules_config.get('chk_carton', True)
         limit_carton = float(rules_config.get('val_carton', 6))
-        check_dup_name = rules_config.get('chk_dup_name', True)
-        limit_dup_name = int(rules_config.get('val_dup_name', 3))
-        check_dup_addr = rules_config.get('chk_dup_addr', True)
-        limit_dup_addr = int(rules_config.get('val_dup_addr', 3))
-        check_dup_vat = rules_config.get('chk_dup_vat', True)
-        limit_dup_vat = int(rules_config.get('val_dup_vat', 3))
+        
+        check_split = rules_config.get('chk_split_shipment', True)
+        limit_split = int(rules_config.get('val_split_shipment', 3))
 
         orders = []
         hawb_groups = defaultdict(list)
@@ -355,7 +352,6 @@ class SeaExpressEngine:
 
             if is_fuzzy_multiple:
                 status = "MANUAL_REQUIRED"
-                # 明確標示出是哪一個品名模糊
                 warnings.append(f"稅則模糊 (品項: {desc})")
 
             client_ccc = item.get('ccc')
@@ -370,18 +366,22 @@ class SeaExpressEngine:
                 else:
                     final_ccc = formatted_ccc
                     if len(self.valid_cccs) > 0 and final_ccc not in self.valid_cccs:
-                        # 第2次核對：到 standard_HSCODE 中檢查是否為官方合法稅則
                         if final_ccc not in self.official_cccs:
                             status = "MANUAL_REQUIRED"
-                            warnings.append(f"客戶指定之稅則號不在系統知識庫與海關官方稅則表中: {final_ccc}")
+                            warnings.append(f"客戶指定之稅則號不在海關官方稅則表中: {final_ccc}")
             else:
                 final_ccc = search_result['ccc'] if search_result else None
                 if not search_result:
                     status = "MANUAL_REQUIRED"
                     warnings.append("AI 查無此品名稅號 (且客戶未提供)")
 
+            # 黑名單防呆：雙向轉繁簡體比對 (包含 Contains 判斷)
+            desc_zh_cn = zhconv.convert(desc, 'zh-cn')
+            desc_zh_tw = zhconv.convert(desc, 'zh-tw')
             for kw in self.blacklist:
-                if kw in desc:
+                kw_cn = zhconv.convert(kw, 'zh-cn')
+                kw_tw = zhconv.convert(kw, 'zh-tw')
+                if kw_cn in desc_zh_cn or kw_tw in desc_zh_tw:
                     status = "MANUAL_REQUIRED"
                     warnings.append(f"觸發黑名單關鍵字: {kw}")
                     break
@@ -435,19 +435,22 @@ class SeaExpressEngine:
             orders.append(order)
             hawb_groups[hawb].append(order)
             
+            # 追蹤化整為零的四大指標
             norm_name = self.normalize_for_tracking(item.get('cne_name'))
             norm_addr = self.normalize_for_tracking(item.get('cne_addr'))
             norm_vat = self.normalize_for_tracking(item.get('cne_vat'))
+            norm_phone = self.normalize_for_tracking(item['cne_phone'])
             
             if norm_name: consignee_tracker[f"NAME:{norm_name}"].add(hawb)
             if norm_addr: consignee_tracker[f"ADDR:{norm_addr}"].add(hawb)
             if norm_vat: consignee_tracker[f"VAT:{norm_vat}"].add(hawb)
+            if norm_phone: consignee_tracker[f"PHONE:{norm_phone}"].add(hawb)
 
         for hawb, items in hawb_groups.items():
             hawb_total_amt = sum(i.total_amount for i in items)
-            
             total_nw = round(hawb_net_weights[hawb], 2)
             max_gw = round(hawb_gross_weights[hawb], 2)
+            
             if max_gw > 0 and total_nw > max_gw:
                 for i in items:
                     i.warnings.append(f"重量異常: 該單總淨重 ({total_nw}kg) 大於 總毛重 ({max_gw}kg)")
@@ -459,11 +462,18 @@ class SeaExpressEngine:
                     i.warnings.append("多個項次填寫了箱數，請人工確認並保留第一行")
                     i.processing_status = "MANUAL_REQUIRED"
             elif len(carton_counts) == 1:
-                # 套用動態箱數門檻
-                if check_carton and float(carton_counts[0].cartons) > limit_carton:
-                    for i in items: i.warnings.append(f"總箱數超過 {limit_carton} 箱 (目前 {carton_counts[0].cartons}箱)")
+                c_val = float(carton_counts[0].cartons)
+                # 超標箱數提示
+                if check_carton and c_val > limit_carton:
+                    for i in items: i.warnings.append(f"總箱數超過 {limit_carton} 箱 (目前 {c_val}箱)")
+                
+                # 單件重量嚴格防呆 (> 65KG)
+                if c_val == 1.0:
+                    if max_gw > 65 or total_nw > 65:
+                        for i in items:
+                            i.warnings.append("單件包裹重量超標 (>65KG)，請人工確認是否需拆單或特殊申報")
+                            i.processing_status = "MANUAL_REQUIRED"
 
-            # 套用動態金額門檻
             if check_amount and hawb_total_amt > limit_amount:
                 for i in items: 
                     i.warnings.append(f"分提單總金額超標 (>{limit_amount}): {hawb_total_amt}元")
@@ -472,46 +482,46 @@ class SeaExpressEngine:
             if any(i.processing_status == "MANUAL_REQUIRED" for i in items):
                 for i in items: i.processing_status = "MANUAL_REQUIRED"
 
-        # 套用動態重複收件人門檻
-        suspicious_names = {}
-        if check_dup_name:
-            suspicious_names = {k: v for k, v in consignee_tracker.items() if k.startswith("NAME:") and len(v) >= limit_dup_name}
-            
-        suspicious_addrs = {}
-        if check_dup_addr:
-            suspicious_addrs = {k: v for k, v in consignee_tracker.items() if k.startswith("ADDR:") and len(v) >= limit_dup_addr}
-            
-        suspicious_vats = {}
-        if check_dup_vat:
-            suspicious_vats = {k: v for k, v in consignee_tracker.items() if k.startswith("VAT:") and len(v) >= limit_dup_vat}
+        # 化整為零整合判斷
+        suspicious_groups = {}
+        if check_split:
+            for k, hawbs in consignee_tracker.items():
+                if len(hawbs) >= limit_split:
+                    suspicious_groups[k] = hawbs
         
         for order in orders:
             norm_name = self.normalize_for_tracking(order.consignee_name)
             norm_addr = self.normalize_for_tracking(order.consignee_address)
             norm_vat = self.normalize_for_tracking(order.consignee_vat_no)
+            norm_phone = self.normalize_for_tracking(order.consignee_phone)
             
+            order._split_group_key = None
             added_warnings = set() 
             
-            if norm_name and f"NAME:{norm_name}" in suspicious_names:
-                msg = f"相同收件人超過{len(suspicious_names[f'NAME:{norm_name}'])}件 (姓名重複)"
-                if msg not in added_warnings:
-                    order.warnings.append(msg)
-                    added_warnings.add(msg)
-                    order.processing_status = "MANUAL_REQUIRED"
-                    
-            if norm_addr and f"ADDR:{norm_addr}" in suspicious_addrs:
-                msg = f"相同收件人超過{len(suspicious_addrs[f'ADDR:{norm_addr}'])}件 (地址重複)"
-                if msg not in added_warnings:
-                    order.warnings.append(msg)
-                    added_warnings.add(msg)
-                    order.processing_status = "MANUAL_REQUIRED"
-                    
-            if norm_vat and f"VAT:{norm_vat}" in suspicious_vats:
-                msg = f"相同收件人超過{len(suspicious_vats[f'VAT:{norm_vat}'])}件 (統編/身分證重複)"
-                if msg not in added_warnings:
-                    order.warnings.append(msg)
-                    added_warnings.add(msg)
-                    order.processing_status = "MANUAL_REQUIRED"
+            keys_to_check = [
+                (f"PHONE:{norm_phone}", "電話"),
+                (f"ADDR:{norm_addr}", "地址"),
+                (f"VAT:{norm_vat}", "統編/身分證"),
+                (f"NAME:{norm_name}", "姓名")
+            ]
+            
+            for key, label in keys_to_check:
+                if key in suspicious_groups:
+                    msg = f"化整為零: 相同收件人達 {limit_split} 件以上 ({label}重複)"
+                    if msg not in added_warnings:
+                        order.warnings.append(msg)
+                        added_warnings.add(msg)
+                        order.processing_status = "MANUAL_REQUIRED"
+                    if not order._split_group_key:
+                        order._split_group_key = key
+
+        # 排序機制：讓化整為零的單據排最前面且群組相鄰
+        def sort_key(ord_obj):
+            is_split = 0 if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key else 1
+            group_val = ord_obj._split_group_key if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key else ""
+            return (is_split, group_val, ord_obj.hawb_no or "", ord_obj.item_no or 0)
+            
+        orders.sort(key=sort_key)
 
         for order in orders:
             if not order.warnings and order.processing_status == "PENDING":
@@ -546,7 +556,6 @@ class SeaExpressEngine:
             if not filtered_data:
                 return False, f"匯入失敗：Excel 中的所有分提單號 ({len(skipped_hawbs)}筆) 在該主單中皆已存在，全部略過。"
 
-            # 將 rules_config 傳入商業邏輯審核函式
             orders = self.apply_business_rules(filtered_data, mawb_no, rules_config)
             
             for order in orders:
