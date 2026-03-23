@@ -10,14 +10,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database_models import SessionLocal, SeaExpressOrder, BlacklistKeyword
 import unicodedata
-import zhconv  # 用於繁簡轉換
+import zhconv  
 
-# --- 設定 Log ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class SeaExpressEngine:
     def __init__(self):
-        """初始化核心引擎，預載入知識庫與黑名單到記憶體"""
         self.session = SessionLocal()
         self.knowledge_base = self._load_knowledge_base()
         self.blacklist = self._load_blacklist()
@@ -50,7 +48,6 @@ class SeaExpressEngine:
         return cccs
 
     def _load_official_cccs(self):
-        """載入海關官方所有的合法稅則號 (用於第2次核對)"""
         cccs = set()
         try:
             result = self.session.execute(text("SELECT DISTINCT ccc_code FROM standard_HSCODE"))
@@ -85,20 +82,14 @@ class SeaExpressEngine:
 
     def _search_knowledge_base(self, raw_desc):
         if not raw_desc: return None, False
-
         clean_desc = self._normalize_text(raw_desc)
         if not clean_desc: return None, False
 
-        if clean_desc in self.knowledge_base:
-            return self.knowledge_base[clean_desc], False
-
+        if clean_desc in self.knowledge_base: return self.knowledge_base[clean_desc], False
         desc_zh_cn = zhconv.convert(clean_desc, 'zh-cn')
-        if desc_zh_cn != clean_desc and desc_zh_cn in self.knowledge_base:
-            return self.knowledge_base[desc_zh_cn], False
-
+        if desc_zh_cn != clean_desc and desc_zh_cn in self.knowledge_base: return self.knowledge_base[desc_zh_cn], False
         desc_zh_tw = zhconv.convert(clean_desc, 'zh-tw')
-        if desc_zh_tw != clean_desc and desc_zh_tw in self.knowledge_base:
-            return self.knowledge_base[desc_zh_tw], False
+        if desc_zh_tw != clean_desc and desc_zh_tw in self.knowledge_base: return self.knowledge_base[desc_zh_tw], False
 
         matches = []
         for kb_key, kb_data in self.knowledge_base.items():
@@ -107,37 +98,22 @@ class SeaExpressEngine:
 
         if matches:
             matches.sort(key=lambda x: (x['data']['freq'], len(x['key'])), reverse=True)
-            winner = matches[0]
-            is_fuzzy_multiple = len(matches) > 1
-            return winner['data'], is_fuzzy_multiple
+            return matches[0]['data'], len(matches) > 1
 
         return None, False
 
     def get_candidates(self, raw_desc):
-        """🌟 恢復舊版功能：撈取 AI 歷史推薦選單"""
         if not raw_desc: return []
         clean_desc = self._normalize_text(raw_desc)
         if not clean_desc: return []
-
         desc_zh_cn = zhconv.convert(clean_desc, 'zh-cn')
         desc_zh_tw = zhconv.convert(clean_desc, 'zh-tw')
-
         matches = []
         for kb_key, kb_data in self.knowledge_base.items():
             if kb_key in clean_desc or kb_key in desc_zh_cn or kb_key in desc_zh_tw:
-                matches.append({
-                    'official': kb_data['official'], 
-                    'ccc': kb_data['ccc'], 
-                    'freq': kb_data['freq'], 
-                    'key': kb_key
-                })
-
-        if not matches:
-            return []
-
-        # 依照樣本出現次數與長度排序
+                matches.append({'official': kb_data['official'], 'ccc': kb_data['ccc'], 'freq': kb_data['freq'], 'key': kb_key})
+        if not matches: return []
         matches.sort(key=lambda x: (x['freq'], len(x['key'])), reverse=True)
-        
         seen = set()
         unique_matches = []
         for m in matches:
@@ -145,37 +121,25 @@ class SeaExpressEngine:
             if pair not in seen:
                 seen.add(pair)
                 unique_matches.append({"official": m['official'], "ccc": m['ccc']})
-            if len(unique_matches) >= 5: # 最多推薦 5 筆
-                break
-                
+            if len(unique_matches) >= 5: break
         return unique_matches
 
     def clean_and_validate_phone(self, phone_str):
         if not phone_str or pd.isna(phone_str): return "", True
-            
         phone_str = str(phone_str).strip()
         if phone_str.endswith('.0'): phone_str = phone_str[:-2]
-            
         phone_str = re.sub(r'[A-Za-z]', '', phone_str)
         clean_phone = re.sub(r'[\s\-\(\)]', '', phone_str)
-        
         if not clean_phone: return "", True
-            
-        if not clean_phone.startswith('0'):
-            clean_phone = '0' + clean_phone
-            
+        if not clean_phone.startswith('0'): clean_phone = '0' + clean_phone
         prefix = clean_phone[:2]
-        
         if prefix == '09':
             if len(clean_phone) == 10 and clean_phone.isdigit(): return clean_phone, True
             else: return clean_phone, False
-                
         if prefix == '01': return clean_phone, False
-            
         if prefix in ['02', '03', '04', '05', '06', '07', '08']:
             if clean_phone.isdigit(): return clean_phone, True
             else: return clean_phone, False
-            
         return clean_phone, False
 
     def validate_vat_id(self, vat_str):
@@ -210,7 +174,6 @@ class SeaExpressEngine:
 
     def parse_excel(self, filepath):
         is_csv = filepath.lower().endswith('.csv')
-        
         try:
             if is_csv:
                 try: df_preview = pd.read_csv(filepath, header=None, nrows=10, encoding='utf-8')
@@ -239,7 +202,6 @@ class SeaExpressEngine:
             return []
 
         columns = df.columns.tolist()
-        
         idx = {
             'hawb': self._find_col(columns, ['分提單', '分提單號碼']),
             'item': self._find_col(columns, ['貨物編號', '項次']),
@@ -295,22 +257,18 @@ class SeaExpressEngine:
                     val_str = str(row.iloc[i]).replace(',', '').strip()
                     return float(val_str) if val_str else 0.0
                 return 0.0
-            except: 
-                return 0.0
+            except: return 0.0
 
         for index, row in df.iterrows():
             is_missing_parent = False
             hawb_val = get_str(row, idx['hawb'])
-            
             if hawb_val: 
                 current_hawb = hawb_val
                 current_gw = get_float(row, idx['gw'])
                 current_cartons = get_float(row, idx['cartons'])
-            else:
-                is_missing_parent = True
+            else: is_missing_parent = True
                 
             if not current_hawb: continue
-            
             desc_val = get_str(row, idx['desc'])
             if not desc_val: continue
 
@@ -318,10 +276,8 @@ class SeaExpressEngine:
             parsed_item_no = int(float(item_no_val)) if item_no_val and item_no_val.replace('.', '', 1).isdigit() else 0
 
             item_data = {
-                'hawb_no': current_hawb, 
-                'item_no': parsed_item_no, 
-                'description_original': desc_val,
-                'missing_parent': is_missing_parent
+                'hawb_no': current_hawb, 'item_no': parsed_item_no, 
+                'description_original': desc_val, 'missing_parent': is_missing_parent
             }
             
             for key in idx:
@@ -335,24 +291,18 @@ class SeaExpressEngine:
                 item_data['gw'] = get_float(row, idx['gw'])
                 item_data['cartons'] = get_float(row, idx['cartons'])
 
-            if not item_data.get('cne_name') and idx['cne_name'] is None: 
-                item_data['cne_name'] = self._find_col_fallback(row, columns, ['收件人', '收貨人'])
-            if not item_data.get('cne_addr') and idx['cne_addr'] is None: 
-                item_data['cne_addr'] = self._find_col_fallback(row, columns, ['地址'])
-                
+            if not item_data.get('cne_name') and idx['cne_name'] is None: item_data['cne_name'] = self._find_col_fallback(row, columns, ['收件人', '收貨人'])
+            if not item_data.get('cne_addr') and idx['cne_addr'] is None: item_data['cne_addr'] = self._find_col_fallback(row, columns, ['地址'])
             raw_data.append(item_data)
             
         return raw_data
 
     def apply_business_rules(self, raw_data, mawb_no, rules_config=None):
-        if rules_config is None:
-            rules_config = {}
-            
+        if rules_config is None: rules_config = {}
         check_amount = rules_config.get('chk_amount', True)
         limit_amount = float(rules_config.get('val_amount', 48000))
         check_carton = rules_config.get('chk_carton', True)
         limit_carton = float(rules_config.get('val_carton', 6))
-        
         check_split = rules_config.get('chk_split_shipment', True)
         limit_split = int(rules_config.get('val_split_shipment', 3))
 
@@ -360,7 +310,6 @@ class SeaExpressEngine:
         hawb_groups = defaultdict(list)
         consignee_tracker = defaultdict(set)
         hawb_item_counter = defaultdict(int)
-        
         hawb_net_weights = defaultdict(float)
         hawb_gross_weights = defaultdict(float)
 
@@ -372,10 +321,8 @@ class SeaExpressEngine:
             
             hawb_item_counter[hawb] += 1
             final_item_no = item['item_no'] if item['item_no'] > 0 else hawb_item_counter[hawb]
-            
             hawb_net_weights[hawb] += item['nw']
-            if item['gw'] > hawb_gross_weights[hawb]: 
-                hawb_gross_weights[hawb] = item['gw']
+            if item['gw'] > hawb_gross_weights[hawb]: hawb_gross_weights[hawb] = item['gw']
             
             if not item.get('missing_parent'):
                 if item.get('gw', 0) <= 0 or item.get('cartons', 0) <= 0:
@@ -391,7 +338,6 @@ class SeaExpressEngine:
 
             client_ccc = item.get('ccc')
             final_ccc = None
-            
             if client_ccc and str(client_ccc).lower() != 'nan' and str(client_ccc).strip() != '':
                 formatted_ccc, is_valid_len = self._format_ccc(client_ccc)
                 if not is_valid_len:
@@ -425,7 +371,6 @@ class SeaExpressEngine:
             qty = item['qty']
             new_price = math.floor(raw_price)
             new_total = new_price * qty
-            
             if new_total != raw_total or raw_price != new_price:
                 warnings.append(f"金額已校正 (原單價:{raw_price}, 原總價:{raw_total} -> 新單價:{new_price}, 新總價:{new_total})")
 
@@ -441,24 +386,15 @@ class SeaExpressEngine:
                 warnings.append(f"收貨人統編/身分證格式異常: {item.get('cne_vat')}")
             item['cne_vat'] = clean_vat
 
-            brand_val = item.get('brand') if item.get('brand') else 'No Brand'
-            spec_val = item.get('spec') if item.get('spec') else 'N/M'
-            curr_val = item.get('currency') if item.get('currency') else 'TWD'
-            term_val = item.get('trade_term') if item.get('trade_term') else 'FOB'
-            origin_val = item.get('origin') if item.get('origin') else 'CN'
-            marks_val = item.get('marks') if item.get('marks') else 'N/M'
-            ctn_unit_val = item.get('ctn_unit') if item.get('ctn_unit') else 'CTN'
-
             order = SeaExpressOrder(
                 mawb_no=mawb_no, hawb_no=hawb, item_no=final_item_no,
                 description_original=desc, description_official=official_desc, ccc_code=final_ccc,
-                brand=brand_val, spec=spec_val, qty=qty, qty_unit=item.get('qty_unit'),
-                unit_price=new_price, currency=curr_val, total_amount=new_total,
+                brand=item.get('brand') or 'No Brand', spec=item.get('spec') or 'N/M', qty=qty, qty_unit=item.get('qty_unit'),
+                unit_price=new_price, currency=item.get('currency') or 'TWD', total_amount=new_total,
                 net_weight=item['nw'] if item['nw'] > 0 else None, gross_weight=item['gw'] if item['gw'] > 0 else None,
-                trade_term=term_val, origin_country=origin_val, marks=marks_val,
-                cartons=item['cartons'] if item['cartons'] > 0 else None, ctn_unit=ctn_unit_val,
-                courier_vat_no=item.get('courier_vat'),
-                shipper_name=item.get('shp_name'), shipper_phone=item.get('shp_phone'), shipper_address=item.get('shp_addr'),
+                trade_term=item.get('trade_term') or 'FOB', origin_country=item.get('origin') or 'CN', marks=item.get('marks') or 'N/M',
+                cartons=item['cartons'] if item['cartons'] > 0 else None, ctn_unit=item.get('ctn_unit') or 'CTN',
+                courier_vat_no=item.get('courier_vat'), shipper_name=item.get('shp_name'), shipper_phone=item.get('shp_phone'), shipper_address=item.get('shp_addr'),
                 consignee_name=item.get('cne_name'), consignee_name_ch=item.get('cne_name_ch'),
                 consignee_address=item.get('cne_addr'), consignee_address_ch=item.get('cne_addr_ch'),
                 consignee_phone=item['cne_phone'], consignee_vat_no=item['cne_vat'], consignee_id_type=item.get('cne_id_type'),
@@ -469,10 +405,10 @@ class SeaExpressEngine:
             orders.append(order)
             hawb_groups[hawb].append(order)
             
-            norm_name = self.normalize_for_tracking(item.get('cne_name'))
-            norm_addr = self.normalize_for_tracking(item.get('cne_addr'))
-            norm_vat = self.normalize_for_tracking(item.get('cne_vat'))
-            norm_phone = self.normalize_for_tracking(item['cne_phone'])
+            norm_name = self.normalize_for_tracking(order.consignee_name)
+            norm_addr = self.normalize_for_tracking(order.consignee_address)
+            norm_vat = self.normalize_for_tracking(order.consignee_vat_no)
+            norm_phone = self.normalize_for_tracking(order.consignee_phone)
             
             if norm_name: consignee_tracker[f"NAME:{norm_name}"].add(hawb)
             if norm_addr: consignee_tracker[f"ADDR:{norm_addr}"].add(hawb)
@@ -489,16 +425,24 @@ class SeaExpressEngine:
                     i.warnings.append(f"重量異常: 該單總淨重 ({total_nw}kg) 大於 總毛重 ({max_gw}kg)")
                     i.processing_status = "MANUAL_REQUIRED"
             
-            carton_counts = [i for i in items if i.cartons and float(i.cartons) > 0]
+            # 🌟 修復 1：單件 65KG 嚴格判定，支援未填箱數但僅有 1 個項次的包裹
+            carton_counts = [i for i in items if i.cartons and str(i.cartons).replace('.', '', 1).isdigit()]
+            c_val = 0.0
             if len(carton_counts) > 1:
                 for i in items:
                     i.warnings.append("多個項次填寫了箱數，請人工確認並保留第一行")
                     i.processing_status = "MANUAL_REQUIRED"
+                c_val = sum(float(i.cartons) for i in carton_counts)
             elif len(carton_counts) == 1:
                 c_val = float(carton_counts[0].cartons)
+            elif len(carton_counts) == 0 and len(items) == 1:
+                c_val = 1.0  # 若客戶沒填，但單子只有一行，視為單件
+                
+            if c_val > 0:
                 if check_carton and c_val > limit_carton:
                     for i in items: i.warnings.append(f"總箱數超過 {limit_carton} 箱 (目前 {c_val}箱)")
                 
+                # 嚴格判斷大於 65
                 if c_val == 1.0:
                     if max_gw > 65 or total_nw > 65:
                         for i in items:
@@ -525,9 +469,7 @@ class SeaExpressEngine:
             norm_vat = self.normalize_for_tracking(order.consignee_vat_no)
             norm_phone = self.normalize_for_tracking(order.consignee_phone)
             
-            order._split_group_key = None
             added_warnings = set() 
-            
             keys_to_check = [
                 (f"PHONE:{norm_phone}", "電話"),
                 (f"ADDR:{norm_addr}", "地址"),
@@ -537,43 +479,27 @@ class SeaExpressEngine:
             
             for key, label in keys_to_check:
                 if key in suspicious_groups:
-                    msg = f"化整為零: 相同收件人達 {limit_split} 件以上 ({label}重複)"
+                    # 🌟 修復 2：將具體重複的號碼寫入警告中，作為 API 排序的分群依據
+                    val = key.split(':', 1)[1]
+                    msg = f"化整為零: 相同收件人達 {limit_split} 件以上 ({label}重複: {val})"
                     if msg not in added_warnings:
                         order.warnings.append(msg)
                         added_warnings.add(msg)
                         order.processing_status = "MANUAL_REQUIRED"
-                    if not order._split_group_key:
-                        order._split_group_key = key
 
-        # 🌟 修復 1：三層置頂排序機制 (化整為零 > 一般異常 > 正常放行)
+        # 確保同單狀態一致
         hawb_status_map = {}
         for o in orders:
             if o.processing_status == "MANUAL_REQUIRED":
                 hawb_status_map[o.hawb_no] = True
-        
         for o in orders:
             if hawb_status_map.get(o.hawb_no):
                 o.processing_status = "MANUAL_REQUIRED"
+            if not o.warnings and o.processing_status == "PENDING":
+                o.processing_status = "PROCESSED"
+            o.warnings = json.dumps(o.warnings, ensure_ascii=False)
 
-        def sort_key(ord_obj):
-            if ord_obj.processing_status == "MANUAL_REQUIRED":
-                if hasattr(ord_obj, '_split_group_key') and ord_obj._split_group_key:
-                    priority = 0
-                else:
-                    priority = 1
-            else:
-                priority = 2
-                
-            group_val = getattr(ord_obj, '_split_group_key', "") or ""
-            return (priority, group_val, ord_obj.hawb_no or "", ord_obj.item_no or 0)
-            
-        orders.sort(key=sort_key)
-
-        for order in orders:
-            if not order.warnings and order.processing_status == "PENDING":
-                order.processing_status = "PROCESSED"
-            order.warnings = json.dumps(order.warnings, ensure_ascii=False)
-
+        # 🌟 修復 3：刪除這裡寫死的 `orders.sort` 邏輯
         return orders
 
     def process_and_save(self, filepath, mawb_no, import_mode='NEW', operator_id=None, rules_config=None):
@@ -585,8 +511,7 @@ class SeaExpressEngine:
             existing_hawbs = set()
             if import_mode == 'NEW':
                 count = self.session.query(SeaExpressOrder).filter(SeaExpressOrder.mawb_no == mawb_no).count()
-                if count > 0:
-                    return False, f"主單號 {mawb_no} 已存在！若要加入資料，請選擇「附加到現存主單」模式。"
+                if count > 0: return False, f"主單號 {mawb_no} 已存在！若要加入資料，請選擇「附加到現存主單」模式。"
             elif import_mode == 'APPEND':
                 result = self.session.query(SeaExpressOrder.hawb_no).filter(SeaExpressOrder.mawb_no == mawb_no).distinct().all()
                 existing_hawbs = {row[0] for row in result}
@@ -599,8 +524,7 @@ class SeaExpressEngine:
                     continue
                 filtered_data.append(item)
 
-            if not filtered_data:
-                return False, f"匯入失敗：Excel 中的所有分提單號 ({len(skipped_hawbs)}筆) 在該主單中皆已存在，全部略過。"
+            if not filtered_data: return False, f"匯入失敗：Excel 中的所有分提單號 ({len(skipped_hawbs)}筆) 在該主單中皆已存在，全部略過。"
 
             orders = self.apply_business_rules(filtered_data, mawb_no, rules_config)
             
@@ -611,7 +535,6 @@ class SeaExpressEngine:
             
             msg = f"成功匯入 {len(orders)} 筆資料。"
             if skipped_hawbs: msg += f" (另有 {len(skipped_hawbs)} 筆分提單因重複已自動略過)"
-            
             return True, msg
             
         except Exception as e:

@@ -132,7 +132,8 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
                 "warnings": [],
                 "total_amount": 0,
                 "estimated_tax": 0.0,
-                "items": []
+                "items": [],
+                "split_group": "" # 用於排序分群的標籤
             }
         
         try:
@@ -140,6 +141,8 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
             for w in item_warns:
                 if w not in hawb_groups[o.hawb_no]["warnings"]:
                     hawb_groups[o.hawb_no]["warnings"].append(w)
+                if w.startswith("化整為零"):
+                    hawb_groups[o.hawb_no]["split_group"] = w
         except: pass
 
         if o.processing_status == "MANUAL_REQUIRED":
@@ -147,7 +150,7 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
 
         hawb_groups[o.hawb_no]["total_amount"] += (o.total_amount or 0)
         
-        # 🌟 若有異常，即時獲取 AI 候選清單
+        # 若有異常，即時獲取 AI 候選清單
         candidates = []
         if o.processing_status == "MANUAL_REQUIRED" and (not o.ccc_code or "模糊" in str(o.warnings) or "查無" in str(o.warnings)):
             candidates = engine.get_candidates(o.description_original)
@@ -187,7 +190,21 @@ def get_orders(mawb_no: str = None, current_user: User = Depends(get_current_use
             
         group["estimated_tax"] = hawb_tax
         
-    return list(hawb_groups.values())
+    grouped_list = list(hawb_groups.values())
+    
+    # 動態三層排序演算法 (每次讀取 API 都會重新排序，確保已審查單據永遠沉底)
+    def sort_key(g):
+        if g["processing_status"] == "MANUAL_REQUIRED":
+            if g["split_group"]: 
+                priority = 0  # 最高優先：化整為零
+            else: 
+                priority = 1  # 次高優先：一般異常
+        else: 
+            priority = 2      # 沉底：已審查
+        return (priority, g["split_group"], g["hawb_no"])
+        
+    grouped_list.sort(key=sort_key)
+    return grouped_list
 
 @app.post("/api/upload")
 async def upload_excel(
@@ -328,7 +345,7 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
     db.add(audit_log)
     db.commit()
     
-    msg = "整單修改並放行成功！"
+    msg = "整單修改並完成審查！"
     if learned_count > 0:
         msg += f" (AI 已自動學習 {learned_count} 筆新詞彙)"
         
@@ -398,7 +415,7 @@ def export_mawb_excel(mawb_no: str, current_user: User = Depends(get_current_use
             "產地": o.origin_country or "",
             "交易條件": o.trade_term or "",
             "標記 (Marks)": o.marks or "",
-            "系統處理狀態": "已放行" if o.processing_status == "PROCESSED" else "異常未處理"
+            "系統處理狀態": "已審查" if o.processing_status == "PROCESSED" else "異常未處理"
         })
 
     df = pd.DataFrame(export_data)
