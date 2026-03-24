@@ -51,6 +51,8 @@
         <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
             <div class="flex items-center space-x-3"><div class="bg-slate-900 text-white p-2 rounded-lg"><i data-lucide="ship" class="w-5 h-5"></i></div><h1 class="text-xl font-bold text-slate-800 tracking-tight">海快報關自動化系統</h1></div>
             <div class="flex items-center space-x-4">
+                <!-- 分類字典管理按鈕 -->
+                <button onclick="openCategoryDictModal()" class="shadcn-button shadcn-button-outline text-sm text-indigo-600 border-indigo-200 hover:bg-indigo-50"><i data-lucide="book" class="w-4 h-4 mr-2"></i>分類字典管理</button>
                 <button onclick="openBlacklistModal()" class="shadcn-button shadcn-button-outline text-sm text-red-600 border-red-200 hover:bg-red-50"><i data-lucide="shield-ban" class="w-4 h-4 mr-2"></i>品名黑名單管理</button>
                 <div class="h-6 w-px bg-slate-200"></div>
                 <span class="text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1 rounded-full flex items-center"><i data-lucide="user" class="w-4 h-4 mr-2 text-slate-500"></i><span id="current-username">User</span></span>
@@ -127,6 +129,32 @@
         </div>
     </div>
 
+    <!-- 分類字典管理 Modal -->
+    <div id="category-dict-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden-view z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[80vh]">
+            <div class="p-5 border-b border-slate-200 flex justify-between items-center shrink-0">
+                <h3 class="text-lg font-bold flex items-center text-indigo-700"><i data-lucide="book" class="w-5 h-5 mr-2"></i>大分類與品名建議字典管理</h3>
+                <button onclick="closeCategoryDictModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 bg-slate-50 border-b border-slate-200 shrink-0">
+                <form id="addCategoryDictForm" class="flex items-end space-x-3" onsubmit="saveCategoryDict(event)">
+                    <input type="hidden" id="catEditId" value="">
+                    <div class="flex-1"><label class="block text-xs font-medium text-slate-500 mb-1">大分類 (例如: 服飾類)</label><input type="text" id="catName" class="shadcn-input" required></div>
+                    <div class="flex-[2]"><label class="block text-xs font-medium text-slate-500 mb-1">建議通關品名 (例如: 棉製男T恤)</label><input type="text" id="catSuggest" class="shadcn-input" required></div>
+                    <div class="flex-1"><label class="block text-xs font-medium text-slate-500 mb-1">稅則號列 (CCC Code)</label><input type="text" id="catCcc" class="shadcn-input font-mono" placeholder="XXXX.XX.XX.XX-X" required></div>
+                    <button type="submit" id="catSubmitBtn" class="shadcn-button shadcn-button-primary bg-indigo-600 px-6">新增</button>
+                    <button type="button" id="catCancelBtn" onclick="resetCategoryDictForm()" class="shadcn-button shadcn-button-outline hidden-view">取消編輯</button>
+                </form>
+            </div>
+            <div class="flex-1 overflow-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-white"><tr><th class="font-semibold text-slate-500 w-1/4">大分類</th><th class="font-semibold text-slate-500">建議品名</th><th class="font-semibold text-slate-500 w-48">稅則號</th><th class="w-32 text-center">操作</th></tr></thead>
+                    <tbody id="category-dict-tbody"><tr><td colspan="4" class="text-center py-8 text-slate-500">載入中...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- 人工修改單據 Modal -->
     <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden-view z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl flex flex-col max-h-full">
@@ -145,8 +173,8 @@
 
                 <h4 class="font-bold text-slate-800 mb-3 border-b pb-2 flex items-center"><i data-lucide="list" class="w-4 h-4 mr-2"></i>各項次明細 (AI 自學習區)</h4>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm border border-slate-200" id="editItemsTable">
-                        <thead class="bg-slate-50"><tr><th class="w-12 text-center p-2">項次</th><th class="p-2 w-64">原始品名 (不可改)</th><th class="p-2 text-indigo-700">正式通關品名 (含 AI 推薦)</th><th class="p-2 w-40 text-indigo-700">CCC 稅則號列</th><th class="p-2 w-20 text-right">數量</th><th class="p-2 w-24 text-right">單價</th><th class="p-2 w-24 text-right">總價</th><th class="p-2 w-20 text-right">淨重</th></tr></thead>
+                    <table class="w-full text-sm border border-slate-200" id="editItemsTable" style="min-width: 900px;">
+                        <thead class="bg-slate-50"><tr><th class="w-12 text-center p-2">項次</th><th class="p-2 w-56">原始品名 (不可改)</th><th class="p-2 text-indigo-700 w-80">正式通關品名</th><th class="p-2 w-48 text-indigo-700">CCC 稅則號列</th><th class="p-2 w-16 text-right">數量</th><th class="p-2 w-20 text-right">單價</th><th class="p-2 w-24 text-right">總價</th><th class="p-2 w-16 text-right">淨重</th></tr></thead>
                         <tbody id="editItemsBody"></tbody>
                     </table>
                 </div>
@@ -159,7 +187,14 @@
     </div>
 
     <script>
-        const API_URL = ''; let currentMawb = ''; let currentOrdersData = []; let editCurrentHawbGroup = null;
+        const API_URL = ''; 
+        let currentMawb = ''; 
+        let currentOrdersData = []; 
+        let editCurrentHawbGroup = null;
+        
+        // 存放前端的全域分類字典 (格式: { "大分類A": [{name: "品名1", ccc: "111"}, ...], ... })
+        let globalCategoryDict = {};
+
         lucide.createIcons();
 
         function showLoader(text = '處理中...') { document.getElementById('loader-text').innerText = text; document.getElementById('global-loader').classList.remove('hidden-view'); }
@@ -198,6 +233,7 @@
                     document.getElementById('current-username').innerText = `${user.username} (${user.role})`;
                     document.getElementById('login-view').classList.add('hidden-view'); document.getElementById('main-view').classList.remove('hidden-view');
                     loadMawbs();
+                    fetchGlobalCategoryDict(); // 登入成功順便預載分類字典
                 } else { logout(); }
             } catch (err) { logout(); }
         }
@@ -299,6 +335,64 @@
             } catch (e) { alert("下載失敗"); } finally { hideLoader(); }
         }
 
+        // ================= 兩層式分類字典輔助功能 =================
+        async function fetchGlobalCategoryDict() {
+            try {
+                const res = await fetchAPI('/api/category_dict');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // 轉換為 Group 結構： { "服飾類": [ {name: "棉T恤", ccc: "123"}, ... ], ... }
+                globalCategoryDict = {};
+                data.forEach(item => {
+                    if (!globalCategoryDict[item.category_name]) globalCategoryDict[item.category_name] = [];
+                    globalCategoryDict[item.category_name].push({ name: item.suggested_name, ccc: item.ccc_code });
+                });
+            } catch (e) { console.error("分類字典載入失敗", e); }
+        }
+
+        function toggleDictPanel(itemId) {
+            const panel = document.getElementById(`dictPanel_${itemId}`);
+            if (panel.classList.contains('hidden-view')) {
+                // 展開面板並渲染第一層(大分類)
+                panel.classList.remove('hidden-view');
+                const level1Select = document.getElementById(`dictLevel1_${itemId}`);
+                level1Select.innerHTML = '<option value="">-- 選擇大分類 --</option>';
+                Object.keys(globalCategoryDict).forEach(catName => {
+                    level1Select.innerHTML += `<option value="${catName}">${catName}</option>`;
+                });
+                document.getElementById(`dictLevel2_${itemId}`).innerHTML = '<option value="">-- 先選擇大分類 --</option>';
+            } else {
+                panel.classList.add('hidden-view');
+            }
+        }
+
+        function updateDictLevel2(itemId) {
+            const catName = document.getElementById(`dictLevel1_${itemId}`).value;
+            const level2Select = document.getElementById(`dictLevel2_${itemId}`);
+            
+            if (!catName) {
+                level2Select.innerHTML = '<option value="">-- 先選擇大分類 --</option>';
+                return;
+            }
+            
+            level2Select.innerHTML = '<option value="">-- 選擇建議品名 --</option>';
+            globalCategoryDict[catName].forEach(item => {
+                level2Select.innerHTML += `<option value="${item.name}|${item.ccc}">${item.name} (${item.ccc})</option>`;
+            });
+        }
+
+        function applyDictSelection(itemId) {
+            const val = document.getElementById(`dictLevel2_${itemId}`).value;
+            if(!val) return;
+            const parts = val.split('|'); // parts[0]=品名, parts[1]=稅號
+            
+            // 將字典的值帶入原本的輸入框，但不鎖定，操作員仍可隨時修改
+            document.getElementById(`editItemDesc_${itemId}`).value = parts[0];
+            document.getElementById(`editItemCcc_${itemId}`).value = parts[1];
+        }
+        
+        // AI 歷史推薦選單連動
         function applyCandidate(itemId, val) {
             if(!val) return; const parts = val.split('|');
             document.getElementById(`editItemDesc_${itemId}`).value = parts[0]; document.getElementById(`editItemCcc_${itemId}`).value = parts[1];
@@ -316,17 +410,54 @@
 
             const tbody = document.getElementById('editItemsBody'); tbody.innerHTML = '';
             group.items.forEach(item => {
-                let descInputHtml = `<input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}">`;
+                
+                // 1. AI 歷史推薦區塊
+                let aiRecommendHtml = '';
                 if (item.candidates && item.candidates.length > 0) {
                     let options = `<option value="">-- AI 歷史推薦選單 --</option>`;
                     item.candidates.forEach(c => options += `<option value="${c.official}|${c.ccc}">[推薦] ${c.official} (${c.ccc})</option>`);
-                    descInputHtml = `<div class="flex flex-col space-y-1"><select class="shadcn-input p-1 border-indigo-200 text-xs bg-indigo-50 text-indigo-700 font-medium" onchange="applyCandidate(${item.id}, this.value)">${options}</select><input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}" placeholder="請點上方選單或手動輸入"></div>`;
+                    aiRecommendHtml = `<select class="shadcn-input p-1 border-indigo-200 text-xs bg-indigo-50 text-indigo-700 font-medium mb-1" onchange="applyCandidate(${item.id}, this.value)">${options}</select>`;
                 }
+                
+                // 2. 普遍輔助：分類字典展開面板
+                const dictPanelHtml = `
+                    <div id="dictPanel_${item.id}" class="hidden-view mt-1 p-2 bg-slate-50 border border-slate-200 rounded">
+                        <select id="dictLevel1_${item.id}" class="shadcn-input p-1 mb-1 text-xs" onchange="updateDictLevel2(${item.id})">
+                            <option value="">-- 選擇大分類 --</option>
+                        </select>
+                        <select id="dictLevel2_${item.id}" class="shadcn-input p-1 text-xs" onchange="applyDictSelection(${item.id})">
+                            <option value="">-- 選擇建議品名 --</option>
+                        </select>
+                    </div>
+                `;
+
+                // 3. 通關品名輸入框與功能按鈕
+                const descInputHtml = `
+                    <div class="flex flex-col">
+                        ${aiRecommendHtml}
+                        <input type="text" id="editItemDesc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500" value="${item.description_official || ''}" placeholder="手動輸入或點擊下方字典輔助">
+                        <button type="button" onclick="toggleDictPanel(${item.id})" class="text-xs text-indigo-600 mt-1 flex items-center hover:text-indigo-800 font-medium w-fit">
+                            <i data-lucide="book-open" class="w-3 h-3 mr-1"></i> 分類字典輔助
+                        </button>
+                        ${dictPanelHtml}
+                    </div>
+                `;
+
                 const tr = document.createElement('tr'); tr.className = "border-b border-slate-100 hover:bg-slate-50";
-                tr.innerHTML = `<td class="text-center p-2 font-mono text-slate-500">${item.item_no}</td><td class="p-2 font-medium text-slate-700">${item.description_original}</td><td class="p-2">${descInputHtml}</td><td class="p-2"><input type="text" id="editItemCcc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500 font-mono" value="${item.ccc_code || ''}" placeholder="11碼"></td><td class="p-2"><input type="number" id="editItemQty_${item.id}" class="shadcn-input p-1 text-right" value="${item.qty}"></td><td class="p-2"><input type="number" id="editItemPrice_${item.id}" class="shadcn-input p-1 text-right" value="${item.unit_price}"></td><td class="p-2"><input type="number" id="editItemTotal_${item.id}" class="shadcn-input p-1 text-right" value="${item.total_amount}"></td><td class="p-2"><input type="number" id="editItemNw_${item.id}" class="shadcn-input p-1 text-right" value="${item.net_weight || 0}"></td>`;
+                tr.innerHTML = `
+                    <td class="text-center p-2 font-mono text-slate-500 align-top pt-3">${item.item_no}</td>
+                    <td class="p-2 font-medium text-slate-700 align-top pt-3">${item.description_original}</td>
+                    <td class="p-2 align-top">${descInputHtml}</td>
+                    <td class="p-2 align-top"><input type="text" id="editItemCcc_${item.id}" class="shadcn-input p-1 border-indigo-200 focus:border-indigo-500 font-mono" value="${item.ccc_code || ''}" placeholder="11碼"></td>
+                    <td class="p-2 align-top"><input type="number" id="editItemQty_${item.id}" class="shadcn-input p-1 text-right" value="${item.qty}"></td>
+                    <td class="p-2 align-top"><input type="number" id="editItemPrice_${item.id}" class="shadcn-input p-1 text-right" value="${item.unit_price}"></td>
+                    <td class="p-2 align-top"><input type="number" id="editItemTotal_${item.id}" class="shadcn-input p-1 text-right" value="${item.total_amount}"></td>
+                    <td class="p-2 align-top"><input type="number" id="editItemNw_${item.id}" class="shadcn-input p-1 text-right" value="${item.net_weight || 0}"></td>
+                `;
                 tbody.appendChild(tr);
             });
             document.getElementById('edit-modal').classList.remove('hidden-view');
+            lucide.createIcons();
         }
 
         function closeManualEditModal() { document.getElementById('edit-modal').classList.add('hidden-view'); editCurrentHawbGroup = null; }
@@ -350,6 +481,7 @@
             } catch (e) { alert("伺服器連線失敗"); } finally { hideLoader(); }
         }
 
+        // ================= 黑名單管理 =================
         function openBlacklistModal() { document.getElementById('blacklist-modal').classList.remove('hidden-view'); loadBlacklist(); }
         function closeBlacklistModal() { document.getElementById('blacklist-modal').classList.add('hidden-view'); }
         async function loadBlacklist() {
@@ -367,6 +499,87 @@
         async function deleteBlacklistKeyword(id) {
             if (!confirm("確定要刪除此黑名單關鍵字嗎？")) return;
             try { const res = await fetchAPI(`/api/blacklist/${id}`, { method: 'DELETE' }); if (res.ok) { loadBlacklist(); } else { const data = await res.json(); alert(data.detail || "刪除失敗"); } } catch (err) { alert("伺服器連線失敗"); }
+        }
+
+        // ================= 分類字典管理 Modal 邏輯 =================
+        function openCategoryDictModal() { document.getElementById('category-dict-modal').classList.remove('hidden-view'); loadCategoryDict(); }
+        function closeCategoryDictModal() { document.getElementById('category-dict-modal').classList.add('hidden-view'); resetCategoryDictForm(); }
+        
+        function resetCategoryDictForm() {
+            document.getElementById('catEditId').value = '';
+            document.getElementById('catName').value = '';
+            document.getElementById('catSuggest').value = '';
+            document.getElementById('catCcc').value = '';
+            document.getElementById('catSubmitBtn').innerText = '新增';
+            document.getElementById('catCancelBtn').classList.add('hidden-view');
+        }
+
+        function editCategoryDict(id, cat, sug, ccc) {
+            document.getElementById('catEditId').value = id;
+            document.getElementById('catName').value = cat;
+            document.getElementById('catSuggest').value = sug;
+            document.getElementById('catCcc').value = ccc;
+            document.getElementById('catSubmitBtn').innerText = '儲存修改';
+            document.getElementById('catCancelBtn').classList.remove('hidden-view');
+        }
+
+        async function loadCategoryDict() {
+            const tbody = document.getElementById('category-dict-tbody'); tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">載入中...</td></tr>';
+            try {
+                const res = await fetchAPI('/api/category_dict'); if (!res.ok) throw new Error('載入失敗'); 
+                const data = await res.json(); tbody.innerHTML = '';
+                if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">字典內無任何資料</td></tr>'; return; }
+                data.forEach(item => {
+                    const cName = item.category_name.replace(/'/g, "\\'");
+                    const sName = item.suggested_name.replace(/'/g, "\\'");
+                    const ccc = item.ccc_code.replace(/'/g, "\\'");
+                    
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="p-3 font-medium text-indigo-700">${item.category_name}</td>
+                            <td class="p-3 text-slate-800 font-medium">${item.suggested_name}</td>
+                            <td class="p-3 text-slate-500 font-mono">${item.ccc_code}</td>
+                            <td class="p-3 text-center space-x-2">
+                                <button onclick="editCategoryDict(${item.id}, '${cName}', '${sName}', '${ccc}')" class="text-indigo-500 hover:text-indigo-700">修改</button>
+                                <button onclick="deleteCategoryDict(${item.id})" class="text-rose-500 hover:text-rose-700">刪除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-rose-500">載入失敗</td></tr>'; }
+        }
+
+        async function saveCategoryDict(e) {
+            e.preventDefault(); 
+            const id = document.getElementById('catEditId').value;
+            const payload = {
+                category_name: document.getElementById('catName').value,
+                suggested_name: document.getElementById('catSuggest').value,
+                ccc_code: document.getElementById('catCcc').value
+            };
+            
+            try {
+                const method = id ? 'PUT' : 'POST';
+                const endpoint = id ? `/api/category_dict/${id}` : '/api/category_dict';
+                const res = await fetchAPI(endpoint, { method: method, body: JSON.stringify(payload) }); 
+                const data = await res.json(); 
+                if (res.ok) { 
+                    resetCategoryDictForm(); 
+                    loadCategoryDict(); 
+                    fetchGlobalCategoryDict(); // 同步更新前端全域快取
+                } else { alert(data.detail || "儲存失敗"); } 
+            } catch (err) { alert("伺服器連線失敗"); }
+        }
+
+        async function deleteCategoryDict(id) {
+            if (!confirm("確定要刪除這筆字典設定嗎？")) return;
+            try { 
+                const res = await fetchAPI(`/api/category_dict/${id}`, { method: 'DELETE' }); 
+                if (res.ok) { 
+                    loadCategoryDict(); 
+                    fetchGlobalCategoryDict(); // 同步更新前端全域快取
+                } else { const data = await res.json(); alert(data.detail || "刪除失敗"); } 
+            } catch (err) { alert("伺服器連線失敗"); }
         }
 
         window.onload = checkAuth;
