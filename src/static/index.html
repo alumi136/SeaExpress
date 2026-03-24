@@ -174,7 +174,7 @@
                 <h4 class="font-bold text-slate-800 mb-3 border-b pb-2 flex items-center"><i data-lucide="list" class="w-4 h-4 mr-2"></i>各項次明細 (AI 自學習區)</h4>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm border border-slate-200" id="editItemsTable" style="min-width: 900px;">
-                        <thead class="bg-slate-50"><tr><th class="w-12 text-center p-2">項次</th><th class="p-2 w-56">原始品名 (不可改)</th><th class="p-2 text-indigo-700 w-80">正式通關品名</th><th class="p-2 w-48 text-indigo-700">CCC 稅則號列</th><th class="p-2 w-16 text-right">數量</th><th class="p-2 w-20 text-right">單價</th><th class="p-2 w-24 text-right">總價</th><th class="p-2 w-16 text-right">淨重</th></tr></thead>
+                        <thead class="bg-slate-50"><tr><th class="w-12 text-center p-2">項次</th><th class="p-2 w-56">原始品名 (不可改)</th><th class="p-2 text-indigo-700 w-80">正式通關品名</th><th class="p-2 w-48 text-indigo-700">CCC 稅則號列</th><th class="p-2 w-16 text-right">數量</th><th class="p-2 w-20 text-right">單價</th><th class="p-2 w-24 text-right">總價</th><th class="p-2 w-16 text-right">淨重</th><th class="p-2 w-12 text-center">操作</th></tr></thead>
                         <tbody id="editItemsBody"></tbody>
                     </table>
                 </div>
@@ -335,7 +335,7 @@
             } catch (e) { alert("下載失敗"); } finally { hideLoader(); }
         }
 
-        // ================= 🌟 兩層式分類字典輔助功能 (優化：自動展開為清單) 🌟 =================
+        // ================= 兩層式分類字典輔助功能 =================
         async function fetchGlobalCategoryDict() {
             try {
                 const res = await fetchAPI('/api/category_dict');
@@ -361,7 +361,6 @@
                     level1Select.innerHTML += `<option value="${catName}">${catName}</option>`;
                 });
                 
-                // 第二層預設為隱藏，等待第一層選好再自動展開
                 const level2Select = document.getElementById(`dictLevel2_${itemId}`);
                 level2Select.classList.add('hidden-view');
                 level2Select.innerHTML = '';
@@ -380,14 +379,12 @@
                 return;
             }
             
-            // 選好第一層，第二層直接顯示並自動展開為清單 (Listbox) 列出所有資料
             level2Select.classList.remove('hidden-view');
             level2Select.innerHTML = '<option value="" disabled selected class="text-slate-400">-- 請直接點選下方建議品名 --</option>';
             globalCategoryDict[catName].forEach(item => {
                 level2Select.innerHTML += `<option value="${item.name}|${item.ccc}" class="py-1 cursor-pointer">${item.name} (${item.ccc})</option>`;
             });
             
-            // 根據資料筆數動態設定 size 屬性，讓選項「直接列出」而不用再點開下拉選單
             const count = globalCategoryDict[catName].length;
             level2Select.size = count > 6 ? 7 : count + 1;
         }
@@ -398,11 +395,9 @@
             if(!val) return;
             const parts = val.split('|'); // parts[0]=品名, parts[1]=稅號
             
-            // 將字典的值帶入原本的輸入框，但不鎖定，操作員仍可隨時修改
             document.getElementById(`editItemDesc_${itemId}`).value = parts[0];
             document.getElementById(`editItemCcc_${itemId}`).value = parts[1];
             
-            // 選完後自動收起面板，提升操作流暢度
             document.getElementById(`dictPanel_${itemId}`).classList.add('hidden-view');
         }
         
@@ -425,7 +420,6 @@
             const tbody = document.getElementById('editItemsBody'); tbody.innerHTML = '';
             group.items.forEach(item => {
                 
-                // 1. AI 歷史推薦區塊
                 let aiRecommendHtml = '';
                 if (item.candidates && item.candidates.length > 0) {
                     let options = `<option value="">-- AI 歷史推薦選單 --</option>`;
@@ -433,7 +427,6 @@
                     aiRecommendHtml = `<select class="shadcn-input p-1 border-indigo-200 text-xs bg-indigo-50 text-indigo-700 font-medium mb-1" onchange="applyCandidate(${item.id}, this.value)">${options}</select>`;
                 }
                 
-                // 2. 普遍輔助：分類字典展開面板 (修改第二層為動態展開)
                 const dictPanelHtml = `
                     <div id="dictPanel_${item.id}" class="hidden-view mt-1 p-2 bg-slate-50 border border-slate-200 rounded">
                         <select id="dictLevel1_${item.id}" class="shadcn-input p-1 mb-1 text-xs border-indigo-200 text-indigo-700 font-medium" onchange="updateDictLevel2(${item.id})">
@@ -444,7 +437,6 @@
                     </div>
                 `;
 
-                // 3. 通關品名輸入框與功能按鈕
                 const descInputHtml = `
                     <div class="flex flex-col">
                         ${aiRecommendHtml}
@@ -456,7 +448,9 @@
                     </div>
                 `;
 
-                const tr = document.createElement('tr'); tr.className = "border-b border-slate-100 hover:bg-slate-50";
+                const tr = document.createElement('tr'); 
+                tr.id = `itemRow_${item.id}`; // 綁定 ID 供刪除功能定位使用
+                tr.className = "border-b border-slate-100 hover:bg-slate-50";
                 tr.innerHTML = `
                     <td class="text-center p-2 font-mono text-slate-500 align-top pt-3">${item.item_no}</td>
                     <td class="p-2 font-medium text-slate-700 align-top pt-3">${item.description_original}</td>
@@ -466,11 +460,33 @@
                     <td class="p-2 align-top"><input type="number" id="editItemPrice_${item.id}" class="shadcn-input p-1 text-right" value="${item.unit_price}"></td>
                     <td class="p-2 align-top"><input type="number" id="editItemTotal_${item.id}" class="shadcn-input p-1 text-right" value="${item.total_amount}"></td>
                     <td class="p-2 align-top"><input type="number" id="editItemNw_${item.id}" class="shadcn-input p-1 text-right" value="${item.net_weight || 0}"></td>
+                    <td class="p-2 align-top text-center pt-3">
+                        <button type="button" onclick="deleteItemRow(${item.id})" class="text-rose-500 hover:text-rose-700" title="刪除此項次">
+                            <i data-lucide="trash-2" class="w-5 h-5 mx-auto"></i>
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
             document.getElementById('edit-modal').classList.remove('hidden-view');
             lucide.createIcons();
+        }
+
+        // ================= 🌟 刪除項次邏輯 🌟 =================
+        function deleteItemRow(itemId) {
+            // 防呆：確認分單內是否還有品項
+            if (editCurrentHawbGroup.items.length <= 1) {
+                alert("整票分提單至少需要保留一個品項，無法全部刪除！\n若整票均不報關，請聯絡系統管理員或於匯出後刪除該筆資料。");
+                return;
+            }
+            if (!confirm("確定要刪除這個品項嗎？\n刪除並儲存後，該品項將從這張報關單中徹底移除。")) return;
+
+            // 從目前的資料陣列中移除該品項
+            editCurrentHawbGroup.items = editCurrentHawbGroup.items.filter(i => i.id !== itemId);
+            
+            // 從畫面上直接移除該行 (<tr>)
+            const row = document.getElementById(`itemRow_${itemId}`);
+            if (row) row.remove();
         }
 
         function closeManualEditModal() { document.getElementById('edit-modal').classList.add('hidden-view'); editCurrentHawbGroup = null; }
@@ -479,11 +495,14 @@
             if (!editCurrentHawbGroup) return;
             const payload = { mawb_no: editCurrentHawbGroup.mawb_no, consignee_name: document.getElementById('editCneName').value, consignee_phone: document.getElementById('editCnePhone').value, consignee_address: document.getElementById('editCneAddr').value, consignee_vat_no: document.getElementById('editCneVat').value, gross_weight: parseFloat(document.getElementById('editGW').value) || null, cartons: parseFloat(document.getElementById('editCartons').value) || null, items: [] };
             let validationError = false;
+            
+            // 這裡會自動只跑剩下沒被刪除的項次
             editCurrentHawbGroup.items.forEach(item => {
                 const offDesc = document.getElementById(`editItemDesc_${item.id}`).value.trim(); const ccc = document.getElementById(`editItemCcc_${item.id}`).value.trim();
                 if (!offDesc || !ccc) validationError = true;
                 payload.items.push({ id: item.id, description_original: item.description_original, description_official: offDesc, ccc_code: ccc, qty: parseFloat(document.getElementById(`editItemQty_${item.id}`).value) || 0, unit_price: parseFloat(document.getElementById(`editItemPrice_${item.id}`).value) || 0, total_amount: parseFloat(document.getElementById(`editItemTotal_${item.id}`).value) || 0, net_weight: parseFloat(document.getElementById(`editItemNw_${item.id}`).value) || 0 });
             });
+            
             if (validationError) { if(!confirm("部分項次缺少「通關品名」或「稅則號」，確定要強制存檔嗎？這可能導致報關失敗。")) return; }
             showLoader("儲存與 AI 學習中...");
             try {
@@ -514,7 +533,7 @@
             try { const res = await fetchAPI(`/api/blacklist/${id}`, { method: 'DELETE' }); if (res.ok) { loadBlacklist(); } else { const data = await res.json(); alert(data.detail || "刪除失敗"); } } catch (err) { alert("伺服器連線失敗"); }
         }
 
-        // ================= 分類字典管理 Modal 邏輯 =================
+        // ================= 分類字典管理 =================
         function openCategoryDictModal() { document.getElementById('category-dict-modal').classList.remove('hidden-view'); loadCategoryDict(); }
         function closeCategoryDictModal() { document.getElementById('category-dict-modal').classList.add('hidden-view'); resetCategoryDictForm(); }
         
@@ -565,34 +584,19 @@
         async function saveCategoryDict(e) {
             e.preventDefault(); 
             const id = document.getElementById('catEditId').value;
-            const payload = {
-                category_name: document.getElementById('catName').value,
-                suggested_name: document.getElementById('catSuggest').value,
-                ccc_code: document.getElementById('catCcc').value
-            };
-            
+            const payload = { category_name: document.getElementById('catName').value, suggested_name: document.getElementById('catSuggest').value, ccc_code: document.getElementById('catCcc').value };
             try {
                 const method = id ? 'PUT' : 'POST';
                 const endpoint = id ? `/api/category_dict/${id}` : '/api/category_dict';
                 const res = await fetchAPI(endpoint, { method: method, body: JSON.stringify(payload) }); 
                 const data = await res.json(); 
-                if (res.ok) { 
-                    resetCategoryDictForm(); 
-                    loadCategoryDict(); 
-                    fetchGlobalCategoryDict(); // 同步更新前端全域快取
-                } else { alert(data.detail || "儲存失敗"); } 
+                if (res.ok) { resetCategoryDictForm(); loadCategoryDict(); fetchGlobalCategoryDict(); } else { alert(data.detail || "儲存失敗"); } 
             } catch (err) { alert("伺服器連線失敗"); }
         }
 
         async function deleteCategoryDict(id) {
             if (!confirm("確定要刪除這筆字典設定嗎？")) return;
-            try { 
-                const res = await fetchAPI(`/api/category_dict/${id}`, { method: 'DELETE' }); 
-                if (res.ok) { 
-                    loadCategoryDict(); 
-                    fetchGlobalCategoryDict(); // 同步更新前端全域快取
-                } else { const data = await res.json(); alert(data.detail || "刪除失敗"); } 
-            } catch (err) { alert("伺服器連線失敗"); }
+            try { const res = await fetchAPI(`/api/category_dict/${id}`, { method: 'DELETE' }); if (res.ok) { loadCategoryDict(); fetchGlobalCategoryDict(); } else { const data = await res.json(); alert(data.detail || "刪除失敗"); } } catch (err) { alert("伺服器連線失敗"); }
         }
 
         window.onload = checkAuth;

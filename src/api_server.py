@@ -223,7 +223,15 @@ def update_hawb(hawb_no: str, update_data: HAWBUpdate, current_user: User = Depe
     learned_count = 0
     local_kb_cache = {} 
 
+    # 取得前端保留下來的項次 ID 集合
+    incoming_ids = set(item_updates_dict.keys())
+
     for order in orders:
+        # 如果該項次不在前端傳來的名單中，代表操作員在畫面上把它刪除了
+        if order.id not in incoming_ids:
+            db.delete(order)
+            continue
+
         order.consignee_name = update_data.consignee_name
         order.consignee_phone = update_data.consignee_phone
         order.consignee_address = update_data.consignee_address
