@@ -1,0 +1,33 @@
+name: Auto Deploy to GCP VM
+
+# 當程式碼 push 到 main 分支時觸發 (如果您的預設分支叫 master，請改為 master)
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 執行遠端部署腳本                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.GCP_HOST }}
+        username: ${{ secrets.GCP_USERNAME }}
+        key: ${{ secrets.GCP_SSH_KEY }}
+        script: |
+          # 1. 進入 VM 的程式資料夾
+          cd /var/www/html/seaexpress
+          
+          # 2. 放棄 VM 上所有手動修改，強制與 GitHub 線上版本保持完全一致
+          git fetch --all
+          git reset --hard origin/main
+          
+          # 3. 如果有套件更新，自動安裝 (如果您有 requirements.txt 的話)
+          # source venv/bin/activate
+          # pip install -r requirements.txt
+          
+          # 4. 重新啟動 FastAPI 伺服器 (請確保您的 service 名稱正確)
+          # sudo systemctl restart seaexpress
